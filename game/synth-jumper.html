@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Synth Jumper - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        .game-container { max-width: 500px; max-height: 800px; padding: 0; }
+        canvas { display: block; background-color: #12002b; touch-action: none; }
+        .game-ui {
+            position: absolute; top: 15px; left: 0; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 20px;
+            color: white; font-family: var(--font-arcade); font-size: 1rem;
+            text-shadow: 0 0 5px var(--color-secondary-glow); pointer-events: none;
+        }
+        #overlay-screen {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(18, 0, 43, 0.85); backdrop-filter: blur(5px);
+            color: white; font-family: var(--font-arcade);
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; text-align: center; z-index: 100;
+            padding: 20px;
+        }
+        #overlay-screen h2 { font-size: 2.5rem; margin-bottom: 20px; text-shadow: 0 0 10px var(--color-primary-glow); animation: glitch-effect 2s infinite; }
+        #overlay-screen p { font-size: 1.1rem; margin-bottom: 15px; line-height: 1.5; }
+        #overlay-screen button {
+            background-color: var(--color-tertiary-glow); color: black; border: none;
+            padding: 15px 30px; font-family: var(--font-arcade); font-size: 1rem;
+            cursor: pointer; border-radius: 5px; margin-top: 10px;
+            box-shadow: 0 0 10px var(--color-tertiary-glow); transition: transform 0.2s ease;
+        }
+        #overlay-screen button:hover { transform: scale(1.1); }
+        main { padding-bottom: 120px; }
+
+        /* Styles pour le classement et le formulaire */
+        #overlay-screen input {
+            font-family: var(--font-arcade); background: rgba(0,0,0,0.5);
+            border: 2px solid var(--color-secondary-glow); color: white;
+            font-size: 1.2rem; text-align: center; padding: 10px;
+            margin-bottom: 20px; width: 80%; max-width: 300px;
+            box-shadow: 0 0 10px var(--color-secondary-glow); outline: none;
+        }
+        #overlay-screen input:focus {
+             border-color: var(--color-primary-glow);
+             box-shadow: 0 0 15px var(--color-primary-glow);
+        }
+        #leaderboard-container h3 {
+            font-size: 1.2rem; color: var(--color-primary-glow);
+            text-shadow: 0 0 5px var(--color-primary-glow); margin-bottom: 15px;
+        }
+        #leaderboard {
+            list-style-type: decimal; padding-left: 40px; font-size: 0.9rem;
+            max-width: 400px; text-align: left; margin: 0 auto; line-height: 1.6;
+        }
+        #leaderboard li::marker { color: var(--color-secondary-glow); font-weight: bold; }
+        #leaderboard li span { color: var(--color-tertiary-glow); font-weight: bold; float: right; }
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <div class="background-grid"></div>
+    <header>
+        <h1 class="glitch" data-text="SYNTH JUMPER">SYNTH JUMPER</h1>
+    </header>
+    <main>
+        <div class="game-container">
+            <canvas id="gameCanvas"></canvas>
+            <div class="game-ui">
+                <div id="score">SCORE: 0</div>
+                <div id="highscore">BEST: 0</div>
+            </div>
+            <div id="overlay-screen">
+                <h2 id="overlay-title">SYNTH JUMPER</h2>
+                <div id="overlay-text"></div>
+                <button id="start-button">JOUER</button>
+            </div>
+        </div>
+        <div id="mobile-controls">
+            <div id="joystick-container">
+                <div id="joystick-base"><div id="joystick-knob"></div></div>
+            </div>
+        </div>
+        <a href="index.html" class="back-button">&lt; RETOUR</a>
+    </main>
+
+    <script>
+        // ==================================================================
+        //               BLOC AUDIO GLOBAL
+        // ==================================================================
+        const musicPlayer = new Audio('sounds/ambiance.mp3');
+        musicPlayer.loop = true; musicPlayer.volume = 0.3;
+        window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
+        function playSound(src, volume = 1.0) { const audio = new Audio(src); audio.volume = volume; audio.play().catch(e => {}); }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('button, a.back-button').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', () => playSound('sounds/click.mp3')); });
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
+            musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
+            syncMusicState();
+        });
+
+        // ==================================================================
+        //            GESTION DU CLASSEMENT ET DU SERVEUR
+        // ==================================================================
+        const GAME_NAME = "SynthJumper";
+        // ✅✅✅ LA CORRECTION EST ICI ! ✅✅✅
+        // Remplace cette URL par celle de ton serveur sur Render.
+        const API_BASE_URL = "https://online-arcadhub.onrender.com";
+
+        let currentPlayerName = localStorage.getItem('synthJumperPlayerName') || "";
+
+        async function fetchAndDisplayLeaderboard(container) {
+            container.innerHTML = "<p>Chargement du classement...</p>";
+            try {
+                // On utilise la nouvelle URL complète
+                const response = await fetch(`${API_BASE_URL}/api/scores/${GAME_NAME}`);
+                if (!response.ok) throw new Error('Could not fetch scores');
+                const scores = await response.json();
+
+                let content = "<h3>CLASSEMENT TOP 10</h3>";
+                if (scores.length > 0) {
+                    content += "<ol id='leaderboard'>";
+                    scores.forEach(s => {
+                        content += `<li>${s.playerName} <span>${s.score}</span></li>`;
+                    });
+                    content += "</ol>";
+                } else {
+                    content += "<p>Soyez le premier à entrer dans le classement !</p>";
+                }
+                container.innerHTML = content;
+            } catch (error) {
+                console.error("Erreur de chargement du classement:", error);
+                container.innerHTML = "<h3>CLASSEMENT TOP 10</h3><p>Le classement est indisponible.</p>";
+            }
+        }
+
+        async function submitScoreAndRestart() {
+            const playerNameInput = document.getElementById('playerNameInput');
+            const name = playerNameInput.value.trim();
+
+            if (name.length < 3) {
+                alert("Le pseudo doit contenir au moins 3 caractères.");
+                playerNameInput.focus();
+                return;
+            }
+            
+            currentPlayerName = name;
+            localStorage.setItem('synthJumperPlayerName', currentPlayerName);
+            startButton.disabled = true;
+            startButton.textContent = "ENVOI...";
+
+            try {
+                 // On utilise la nouvelle URL complète aussi pour envoyer le score
+                await fetch(`${API_BASE_URL}/api/scores`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerName: currentPlayerName,
+                        score: score,
+                        gameName: GAME_NAME
+                    }),
+                });
+            } catch (error) {
+                console.error("Erreur lors de la soumission du score:", error);
+                alert("La soumission du score a échoué. Vérifiez votre connexion.");
+            }
+            
+            init(); // Redémarre le jeu
+        }
+
+        // ==================================================================
+        //                   LOGIQUE DU JEU "SYNTH JUMPER"
+        // ==================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay-screen');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayText = document.getElementById('overlay-text');
+        const startButton = document.getElementById('start-button');
+        const scoreUI = document.getElementById('score');
+        const highscoreUI = document.getElementById('highscore');
+
+        canvas.width = 500; canvas.height = 800;
+
+        const GRAVITY = 0.4, PLAYER_JUMP = 12, PLAYER_SPEED = 7;
+        let player, platforms, particles, stars, cameraY, score, highscore, gameActive;
+        let leftPressed = false, rightPressed = false;
+
+        class Player {
+            constructor() { this.width = 40; this.height = 50; this.x = canvas.width / 2 - this.width / 2; this.y = canvas.height - 100; this.vx = 0; this.vy = 0; this.trail = []; }
+            draw() { for (let i = 0; i < this.trail.length; i++) { const t = this.trail[i]; ctx.fillStyle = `rgba(0, 242, 255, ${i / this.trail.length * 0.5})`; ctx.fillRect(t.x, t.y, this.width, this.height); } ctx.fillStyle = '#00f2ff'; ctx.shadowColor = '#00f2ff'; ctx.shadowBlur = 15; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; }
+            update() { this.vx = 0; if (leftPressed) this.vx = -PLAYER_SPEED; if (rightPressed) this.vx = PLAYER_SPEED; this.vy += GRAVITY; this.x += this.vx; this.y += this.vy; if (this.x + this.width < 0) this.x = canvas.width; if (this.x > canvas.width) this.x = -this.width; this.trail.push({ x: this.x, y: this.y }); if (this.trail.length > 8) this.trail.shift(); }
+            jump(multiplier = 1) { this.vy = -PLAYER_JUMP * multiplier; createParticles(this.x + this.width / 2, this.y + this.height, '#00f2ff', 5); }
+        }
+        class Platform {
+            constructor(x, y, type = 'normal') { this.x = x; this.y = y; this.width = 100; this.height = 20; this.type = type; this.vx = (Math.random() > 0.5 ? 1 : -1) * (1 + Math.random()); }
+            draw() { let color = '#fffb00'; if (this.type === 'breakable') color = '#ff00c1'; else if (this.type === 'booster') color = '#39FF14'; ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 10; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; }
+            update() { if (this.type === 'moving') { this.x += this.vx; if (this.x < 0 || this.x + this.width > canvas.width) this.vx *= -1; } }
+        }
+        function createParticles(x, y, color, count = 15) { for (let i = 0; i < count; i++) particles.push({ x, y, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, size: Math.random()*4+1, color, life: 40 }); }
+
+        function init() {
+            player = new Player(); platforms = []; particles = []; stars = []; cameraY = 0; score = 0;
+            highscore = localStorage.getItem('synthJumperHighscore') || 0;
+            gameActive = false;
+
+            overlay.style.display = 'flex';
+            overlayTitle.textContent = "SYNTH JUMPER";
+            startButton.textContent = "JOUER";
+            startButton.disabled = false;
+            startButton.onclick = startGame;
+            
+            fetchAndDisplayLeaderboard(overlayText); // Affiche le classement au démarrage
+            
+            platforms.push(new Platform(canvas.width / 2 - 50, canvas.height - 50, 'normal'));
+            for (let i = 1; i < 10; i++) platforms.push(new Platform(Math.random() * (canvas.width - 100), canvas.height - 50 - (i * 80)));
+            for (let i = 0; i < 100; i++) stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2 + 1, speed: Math.random() * 0.2 + 0.1 });
+            
+            updateUI();
+        }
+        
+        function startGame() { if (!gameActive) { gameActive = true; overlay.style.display = 'none'; gameLoop(); } }
+        function updateUI() { scoreUI.textContent = `SCORE: ${score}`; highscoreUI.textContent = `BEST: ${highscore}`; }
+
+        function update() {
+            if (!gameActive) return;
+            player.update();
+            if (player.y < canvas.height / 2 - 100) cameraY = -(player.y - (canvas.height / 2 - 100)); else cameraY = 0;
+            platforms.forEach((p, i) => { p.update(); if (player.vy > 0 && player.x < p.x + p.width && player.x + player.width > p.x && player.y + player.height > p.y && player.y + player.height < p.y + p.height + player.vy) { if (p.type === 'booster') { playSound('sounds/swoosh.mp3', 0.4); player.jump(1.8); } else { playSound('sounds/jump.mp3', 0.2); player.jump(); } if (p.type === 'breakable') { createParticles(p.x + p.width/2, p.y + p.height/2, '#ff00c1'); playSound('sounds/platform-break.mp3', 0.3); platforms.splice(i, 1); } } });
+            let newScore = Math.floor(-Math.min(0, player.y - canvas.height + 50));
+            if (newScore > score) score = newScore;
+            if (score > highscore) { highscore = score; localStorage.setItem('synthJumperHighscore', highscore); }
+            updateUI();
+            if (platforms[platforms.length-1].y > player.y - canvas.height) { let r = Math.random(), type = 'normal'; if (r > 0.9) type = 'booster'; else if (r > 0.8) type = 'breakable'; else if (r > 0.6) type = 'moving'; platforms.push(new Platform(Math.random() * (canvas.width-100), platforms[platforms.length-1].y - 80 - Math.random() * 40, type)); }
+            if (platforms.length > 0 && platforms[0].y > player.y + canvas.height) platforms.shift();
+            if (player.y > cameraY + canvas.height) { playSound('sounds/fall.mp3', 0.5); endGame(); }
+            particles.forEach((p, i) => { p.x+=p.vx; p.y+=p.vy; p.life--; if(p.life <= 0) particles.splice(i,1); });
+        }
+        
+        function endGame() {
+            gameActive = false;
+            overlay.style.display = 'flex';
+            overlayTitle.textContent = "GAME OVER";
+            overlayText.innerHTML = `<p>Score Final : ${score}</p><p>Entrez votre pseudo (3 car. min):</p><input type="text" id="playerNameInput" placeholder="PSEUDO" value="${currentPlayerName}" maxlength="15">`;
+            startButton.textContent = "SOUMETTRE & REJOUER";
+            startButton.disabled = false;
+            startButton.onclick = submitScoreAndRestart;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height); bgGradient.addColorStop(0, '#1a0033'); bgGradient.addColorStop(1, '#12002b'); ctx.fillStyle = bgGradient; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; stars.forEach(star => { let y = (star.y - cameraY * star.speed) % canvas.height; if (y < 0) y += canvas.height; ctx.fillRect(star.x, y, star.size, star.size); });
+            ctx.save(); ctx.translate(0, cameraY); platforms.forEach(p => p.draw()); player.draw(); particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life/40; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); ctx.restore();
+        }
+        
+        function gameLoop() { update(); draw(); if (gameActive) requestAnimationFrame(gameLoop); }
+
+        // --- Contrôles Clavier et Mobile ---
+        document.addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k==='arrowleft'||k==='q') leftPressed=true; if (k==='arrowright'||k==='d') rightPressed=true; });
+        document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k==='arrowleft'||k==='q') leftPressed=false; if (k==='arrowright'||k==='d') rightPressed=false; });
+        const joyContainer = document.getElementById('joystick-container'), joyKnob = document.getElementById('joystick-knob'); let touchStartX = 0;
+        joyContainer.addEventListener('touchstart', e => { e.preventDefault(); touchStartX = e.touches[0].clientX; }, { passive: false });
+        joyContainer.addEventListener('touchmove', e => { e.preventDefault(); let deltaX = Math.max(-60, Math.min(60, e.touches[0].clientX - touchStartX)); joyKnob.style.transform = `translateX(calc(-50% + ${deltaX}px))`; if (deltaX < -10) {leftPressed=true; rightPressed=false;} else if (deltaX > 10) {leftPressed=false; rightPressed=true;} else {leftPressed=false; rightPressed=false;} }, { passive: false });
+        joyContainer.addEventListener('touchend', e => { e.preventDefault(); joyKnob.style.transform = `translateX(-50%)`; leftPressed = false; rightPressed = false; });
+
+        init();
+        draw();
+    </script>
+</body>
+</html>

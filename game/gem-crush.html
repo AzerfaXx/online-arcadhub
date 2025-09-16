@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Gem Crush - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* --- THÈME & INTERFACE (INCHANGÉ) --- */
+        body {
+            background-image: url('background-candy.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+        main {
+            display: flex; flex-direction: column; justify-content: flex-start;
+            align-items: center; min-height: calc(100vh - 150px); padding-top: 20px;
+        }
+        #game-container { position: relative; }
+        #game-info {
+            font-family: var(--font-arcade); color: white; background: rgba(0,0,0,0.5);
+            padding: 10px 20px; border-radius: 20px; border: 3px solid #fff;
+            text-shadow: 2px 2px 3px #000; display: flex; justify-content: space-around;
+            align-items: center; width: 442px; margin-bottom: 15px; font-size: 0.9rem;
+        }
+        #game-board {
+            width: 442px; height: 442px; padding: 5px; background-color: rgba(0,0,0,0.3);
+            border: 3px solid rgba(255,255,255,0.8); border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.4);
+            position: relative; overflow: hidden; backdrop-filter: blur(4px);
+        }
+        .gem {
+            width: 50px; height: 50px; cursor: pointer; position: absolute;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s ease-out, left 0.3s ease-out;
+            will-change: transform, top, left;
+        }
+        .gem.selected { transform: scale(1.15); filter: brightness(1.3); }
+
+        /* --- NOUVELLES FORMES "FLUIDES" --- */
+        .gem-1 { /* Carré arrondi */
+            background-color: #ff00c1; /* Rose */
+            border-radius: 12px;
+        }
+        .gem-2 { /* Cercle */
+            background-color: #00f2ff; /* Cyan */
+            border-radius: 50%;
+        }
+        .gem-3 { /* Goutte (Teardrop) */
+            background-color: #fffb00; /* Jaune */
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(45deg);
+        }
+        .gem-4 { /* Hexagone */
+            background-color: #9d00ff; /* Violet */
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        }
+        .gem-5 { /* Étoile (conservée pour son look unique) */
+            background-color: #ff8c00; /* Orange */
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+
+        /* --- STYLES & ANIMATIONS BONUS (AMÉLIORÉS) --- */
+        .striped-h, .striped-v { position: relative; overflow: hidden; }
+        .striped-h::before, .striped-v::after {
+            content: ''; position: absolute; background: white;
+            box-shadow: 0 0 5px white, 0 0 10px white; border-radius: 2px;
+            animation: pulse-stripe 1s infinite ease-in-out;
+        }
+        .striped-h::before { width: 80%; height: 6px; top: 50%; left: 10%; transform: translateY(-50%); }
+        .striped-v::after { width: 6px; height: 80%; left: 50%; top: 10%; transform: translateX(-50%); }
+        
+        .color-bomb {
+            background: radial-gradient(circle, #ffffff 20%, #ff00c1 50%, #12002b 100%);
+            border-radius: 50%;
+            animation: pulse-bomb 1.5s infinite;
+        }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            font-family: var(--font-arcade); text-align: center;
+            z-index: 100; animation: fadeIn 0.5s; color: white;
+        }
+        .overlay h2 { font-size: 2.2rem; text-shadow: 0 0 10px var(--color-tertiary-glow); }
+        .overlay p { font-size: 1.1rem; margin: 15px 0; line-height: 1.5; }
+        .overlay button {
+            font-family: var(--font-arcade); padding: 15px 30px; border-radius: 10px;
+            border: none; cursor: pointer; font-size: 1rem;
+            background-color: var(--color-primary-glow); color: #000;
+            transition: transform 0.2s;
+        }
+        .overlay button:hover { transform: scale(1.1); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse-stripe { 50% { opacity: 0.6; box-shadow: 0 0 15px white, 0 0 20px white; } }
+        @keyframes pulse-bomb { 50% { transform: scale(1.1); filter: brightness(1.5); } }
+        .clearing { animation: pop-and-shrink 0.5s ease-out forwards; z-index: 10; }
+        @keyframes pop-and-shrink {
+            0% { transform: scale(1.1); } 50% { transform: scale(1.4); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .line-clear-effect {
+            position: absolute; background: white;
+            box-shadow: 0 0 20px 10px white; border-radius: 5px;
+            z-index: 50; animation: flash-out 0.4s ease-out forwards;
+        }
+        @keyframes flash-out { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3); opacity: 0; } }
+        .board-flash-effect {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: white; z-index: 200;
+            animation: board-flash 0.6s ease-out forwards;
+        }
+        @keyframes board-flash { from { opacity: 0.8; } to { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <header><h1 class="glitch" data-text="GEM CRUSH">GEM CRUSH</h1></header>
+    <main>
+        <div id="game-container">
+            <div id="game-info">
+                <div id="level-info">Niveau: <span id="current-level">1</span></div>
+                <div id="moves-info">Coups: <span id="moves-left">20</span></div>
+                <div id="score-info">Score: <span id="current-score">0</span> / <span id="score-target">5000</span></div>
+            </div>
+            <div id="game-board"></div>
+            <div id="end-overlay" class="overlay">
+                <h2 id="overlay-title"></h2><p id="overlay-text"></p><button id="restart-button">Rejouer</button>
+            </div>
+            <div id="level-start-overlay" class="overlay">
+                <h2 id="level-start-title"></h2><p id="level-start-objective"></p><button id="start-level-button">COMMENCER</button>
+            </div>
+        </div>
+        <a href="index.html" class="back-button" style="margin-top: 25px;">&lt; RETOUR</a>
+    </main>
+    <script>
+        // --- GESTION AUDIO (INCHANGÉ) ---
+        const musicPlayer = new Audio('sounds/ambiance.mp3'); musicPlayer.loop = true; musicPlayer.volume = 0.3;
+        window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
+        function playSound(src, volume = 1.0) { try { const audio = new Audio(src); audio.volume = volume; audio.play(); } catch(e) {} }
+        document.addEventListener('DOMContentLoaded', () => {
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
+            musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
+            syncMusicState();
+            initGame(0);
+        });
+
+        // ==================================================================
+        //         ** LOGIQUE DE JEU GEM CRUSH - VERSION FINALE **
+        // ==================================================================
+
+        const gameBoard = document.getElementById('game-board');
+        const GRID_SIZE = 8; const GEM_TYPES_COUNT = 5; const GEM_SIZE = 50; const GAP_SIZE = 4;
+        
+        const levels = [
+            { level: 1, moves: 25, targetScore: 5000, layout: [[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1]] },
+            { level: 2, moves: 20, targetScore: 7000, layout: [[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,0,0,0,0,1,1],[1,1,0,0,0,0,1,1],[1,1,0,0,0,0,1,1],[1,1,0,0,0,0,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1]] },
+            { level: 3, moves: 18, targetScore: 10000, layout: [[1,1,0,0,0,0,1,1],[1,1,1,0,0,1,1,1],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,0,0,1,1,1],[1,1,0,0,0,0,1,1]] }
+        ];
+
+        let grid = []; let isProcessing = true; let gameState = {};
+        let selectedGem = null; let currentLevelIndex = 0;
+
+        function initGame(levelIndex) {
+            currentLevelIndex = levelIndex; const levelConfig = levels[levelIndex];
+            gameState = { score: 0, moves: levelConfig.moves, targetScore: levelConfig.targetScore, isOver: false };
+            grid = []; gameBoard.innerHTML = ''; document.getElementById('end-overlay').style.display = 'none';
+            showLevelStartOverlay(levelConfig);
+        }
+
+        function startGame() {
+            isProcessing = true; const layout = levels[currentLevelIndex].layout;
+            for (let r = 0; r < GRID_SIZE; r++) { grid[r] = []; for (let c = 0; c < GRID_SIZE; c++) { if (layout[r][c] === 1) { do { grid[r][c] = { type: getRandomType(), row: r, col: c, special: null }; } while (isMatchOnStart(r, c)); createGemElement(grid[r][c]); } else { grid[r][c] = null; } } }
+            updateUI(); addClickEvents(); isProcessing = false;
+        }
+
+        function showLevelStartOverlay(levelConfig) {
+            const overlay = document.getElementById('level-start-overlay');
+            document.getElementById('level-start-title').textContent = `Niveau ${levelConfig.level}`;
+            document.getElementById('level-start-objective').innerHTML = `Objectif : <strong>${levelConfig.targetScore} points</strong><br>en <strong>${levelConfig.moves} coups</strong>`;
+            overlay.style.display = 'flex';
+            document.getElementById('start-level-button').onclick = () => { overlay.style.display = 'none'; startGame(); };
+        }
+        
+        function addClickEvents() { gameBoard.addEventListener('click', onGemClick); }
+        
+        async function onGemClick(e) {
+            if (isProcessing) return;
+            const gemElement = e.target.closest('.gem'); if (!gemElement) return;
+            const row = parseInt(gemElement.dataset.row); const col = parseInt(gemElement.dataset.col);
+            const clickedGem = grid[row][col];
+            if (!selectedGem) {
+                selectedGem = clickedGem; selectedGem.element.classList.add('selected'); playSound('sounds/switch.mp3', 0.6);
+            } else {
+                selectedGem.element.classList.remove('selected');
+                if (selectedGem === clickedGem) { selectedGem = null; return; }
+                if (areAdjacent(selectedGem, clickedGem)) {
+                    await attemptSwap(selectedGem, clickedGem);
+                } else {
+                    playSound('sounds/hit.mp3', 0.4);
+                }
+                selectedGem = null;
+            }
+        }
+
+        async function attemptSwap(gem1, gem2) {
+            isProcessing = true;
+            await swapGems(gem1, gem2);
+            
+            // *** GESTION DES COMBOS DE BONUS ***
+            if (gem1.special && gem2.special) {
+                await handleMove(() => triggerBonusCombo(gem1, gem2));
+            } else if (gem1.special === 'color-bomb') {
+                await handleMove(() => triggerColorBomb(gem1, gem2));
+            } else if (gem2.special === 'color-bomb') {
+                await handleMove(() => triggerColorBomb(gem2, gem1));
+            } else {
+                const matchesInfo = findMatches();
+                if (matchesInfo.matched.size > 0) {
+                    await handleMove(() => processMatches(matchesInfo));
+                } else {
+                    playSound('sounds/hit.mp3', 0.4);
+                    await delay(300);
+                    await swapGems(gem1, gem2); // Swap back
+                    isProcessing = false;
+                }
+            }
+        }
+        
+        async function handleMove(action) {
+            gameState.moves--; updateUI(); playSound('sounds/swoosh.mp3', 0.5);
+            await action();
+            await delay(200); // petit délai pour la lisibilité
+            const cascadeMatches = findMatches();
+            if(cascadeMatches.matched.size > 0) {
+                await processMatches(cascadeMatches);
+            }
+            checkGameState(); isProcessing = false;
+        }
+
+        // --- Le reste des fonctions (création, swap, refill etc.) ---
+        
+        async function processMatches(matchesInfo) {
+            let combo = 1; let currentMatchesInfo = matchesInfo;
+            while(currentMatchesInfo.matched.size > 0) {
+                let gemsToClear = new Set(currentMatchesInfo.matched);
+                
+                // Activer les bonus qui sont dans les alignements
+                for (const gem of gemsToClear) {
+                    if (gem.special) {
+                        const bonusClear = await triggerSpecial(gem);
+                        bonusClear.forEach(g => gemsToClear.add(g));
+                    }
+                }
+                
+                playSound('sounds/explosion.mp3', Math.min(1.0, 0.3 * combo));
+                updateScore(gemsToClear.size * 50 * combo);
+
+                // On doit gérer les bonus créés avant de supprimer les gemmes
+                const bonusesToCreate = [...currentMatchesInfo.bonusesToCreate];
+                
+                // Vider la grille des gemmes effacées
+                const clearingPromises = [];
+                for (const gem of gemsToClear) {
+                    if (gem && gem.element && !gem.element.classList.contains('clearing')) {
+                        grid[gem.row][gem.col] = null;
+                        gem.element.classList.add('clearing');
+                        clearingPromises.push(delay(500));
+                    }
+                }
+                await Promise.all(clearingPromises);
+                gameBoard.querySelectorAll('.clearing').forEach(el => el.remove());
+                
+                // Créer les nouveaux bonus
+                for (const bonus of bonusesToCreate) {
+                    // S'assurer que la case est bien vide
+                    if(grid[bonus.row][bonus.col] === null) {
+                        const newGem = { ...bonus, element: null };
+                        grid[bonus.row][bonus.col] = newGem;
+                        createGemElement(newGem);
+                        playSound('sounds/bonus-create.mp3');
+                        newGem.element.animate([{transform: 'scale(0.5)'}, {transform: 'scale(1)'}], 300);
+                    }
+                }
+                
+                await refillBoard();
+                await delay(300);
+                currentMatchesInfo = findMatches();
+                combo++;
+            }
+        }
+
+        function findMatches() {
+            const matched = new Set(); const bonusesToCreate = [];
+            let hMatches = findMatchesInDirection(true); let vMatches = findMatchesInDirection(false);
+            const allMatches = [...hMatches, ...vMatches];
+            
+            for (const match of allMatches) {
+                match.forEach(gem => matched.add(gem));
+                if (match.length >= 4) {
+                    const originGem = match[Math.floor(match.length / 2)];
+                    let special = null;
+                    if (match.length === 4) special = hMatches.includes(match) ? 'striped-h' : 'striped-v';
+                    else if (match.length >= 5) special = 'color-bomb';
+                    
+                    if (special) {
+                        bonusesToCreate.push({ row: originGem.row, col: originGem.col, type: originGem.type, special });
+                    }
+                }
+            }
+            bonusesToCreate.forEach(b => matched.forEach(m => { if (m.row === b.row && m.col === b.col) matched.delete(m); }));
+            return { matched, bonusesToCreate };
+        }
+
+        // --- GESTION DES BONUS ET COMBOS ---
+
+        async function triggerSpecial(bonus) {
+            const toClear = new Set();
+            if (bonus.special.startsWith('striped')) {
+                playSound('sounds/laser-space.mp3', 0.7);
+                const isHorizontal = bonus.special.includes('h');
+                createLineEffect(bonus.row, bonus.col, isHorizontal);
+                if (isHorizontal) { for(let c = 0; c < GRID_SIZE; c++) if(grid[bonus.row][c]) toClear.add(grid[bonus.row][c]); } 
+                else { for(let r = 0; r < GRID_SIZE; r++) if(grid[r][bonus.col]) toClear.add(grid[r][bonus.col]); }
+            }
+            return Array.from(toClear);
+        }
+        
+        async function triggerColorBomb(bomb, target) {
+            playSound('sounds/bomb-explode.mp3');
+            const toClear = new Set([bomb]);
+            grid.flat().filter(g => g && g.type === target.type).forEach(g => toClear.add(g));
+            await processMatches({ matched: toClear, bonusesToCreate: [] });
+        }
+
+        async function triggerBonusCombo(gem1, gem2) {
+            const toClear = new Set([gem1, gem2]);
+            const specials = [gem1.special, gem2.special].sort().join(',');
+
+            if (specials.includes('striped') && specials.includes('striped')) { // Rayé + Rayé
+                playSound('sounds/bomb-explode.mp3', 0.8);
+                createLineEffect(gem1.row, gem1.col, true);
+                createLineEffect(gem1.row, gem1.col, false);
+                for(let c = 0; c < GRID_SIZE; c++) if(grid[gem1.row][c]) toClear.add(grid[gem1.row][c]);
+                for(let r = 0; r < GRID_SIZE; r++) if(grid[r][gem1.col]) toClear.add(grid[r][gem1.col]);
+            }
+            else if (specials.includes('color-bomb') && specials.includes('striped')) { // Rayé + Bombe
+                playSound('sounds/win.mp3', 0.8);
+                const stripedGem = gem1.special.includes('striped') ? gem1 : gem2;
+                const targetType = stripedGem.type;
+                const gemsToStripe = grid.flat().filter(g => g && g.type === targetType);
+                for (const g of gemsToStripe) {
+                    toClear.add(g);
+                    const bonusClear = await triggerSpecial({...g, special: 'striped-h'}); // Peu importe h ou v
+                    bonusClear.forEach(b => toClear.add(b));
+                }
+            }
+            else if (specials === 'color-bomb,color-bomb') { // Bombe + Bombe
+                playSound('sounds/win.mp3', 1.0);
+                const flash = document.createElement('div');
+                flash.className = 'board-flash-effect';
+                gameBoard.appendChild(flash);
+                grid.flat().forEach(g => { if(g) toClear.add(g); });
+                await delay(600);
+                flash.remove();
+            }
+            await processMatches({ matched: toClear, bonusesToCreate: [] });
+        }
+
+        // --- Fonctions utilitaires, UI, etc. ---
+        
+        function createLineEffect(row, col, isHorizontal) {
+            const effect = document.createElement('div'); effect.className = 'line-clear-effect'; gameBoard.appendChild(effect);
+            const pos = getPosition(row, col);
+            if (isHorizontal) { effect.style.width = '100%'; effect.style.height = `${GEM_SIZE}px`; effect.style.top = `${pos.top}px`; effect.style.left = '0px'; } 
+            else { effect.style.width = `${GEM_SIZE}px`; effect.style.height = '100%'; effect.style.top = '0px'; effect.style.left = `${pos.left}px`; }
+            setTimeout(() => effect.remove(), 400);
+        }
+
+        function createGemElement(gem) {
+            const element = document.createElement('div'); gem.element = element;
+            element.className = `gem gem-${gem.type}`; if (gem.special) element.classList.add(gem.special);
+            element.dataset.row = gem.row; element.dataset.col = gem.col;
+            const { top, left } = getPosition(gem.row, gem.col);
+            element.style.top = `${top}px`; element.style.left = `${left}px`;
+            gameBoard.appendChild(element);
+        }
+
+        async function swapGems(gem1, gem2) { /* ... inchangé ... */
+            const { row: r1, col: c1 } = gem1; const { row: r2, col: c2 } = gem2;
+            gem1.element.style.top = `${getPosition(r2, c2).top}px`; gem1.element.style.left = `${getPosition(r2, c2).left}px`;
+            gem2.element.style.top = `${getPosition(r1, c1).top}px`; gem2.element.style.left = `${getPosition(r1, c1).left}px`;
+            grid[r1][c1] = gem2; grid[r2][c2] = gem1;
+            [gem1.row, gem2.row] = [r2, r1]; [gem1.col, gem2.col] = [c2, c1];
+            gem1.element.dataset.row = gem1.row; gem1.element.dataset.col = gem1.col;
+            gem2.element.dataset.row = gem2.row; gem2.element.dataset.col = gem2.col;
+            await delay(300);
+        }
+
+        async function refillBoard() { /* ... inchangé ... */
+            const layout = levels[currentLevelIndex].layout; const promises = [];
+            for (let c = 0; c < GRID_SIZE; c++) { let emptySlots = 0; for (let r = GRID_SIZE - 1; r >= 0; r--) { if (layout[r][c] === 0) continue; if (grid[r][c] === null) { emptySlots++; } else if (emptySlots > 0) { const gem = grid[r][c]; const newRow = r + emptySlots; grid[newRow][c] = gem; grid[r][c] = null; gem.row = newRow; gem.element.dataset.row = newRow; gem.element.style.top = `${getPosition(newRow, c).top}px`; } }
+                for (let i = 0; i < emptySlots; i++) { const newRow = i; const newGem = { type: getRandomType(), row: newRow, col: c, special: null }; grid[newRow][c] = newGem; createGemElement(newGem); newGem.element.style.top = `${getPosition(newRow, c).top - (emptySlots * GEM_SIZE)}px`; await delay(30); newGem.element.style.top = `${getPosition(newRow, c).top}px`; promises.push(delay(300)); } }
+            await Promise.all(promises);
+        }
+
+        function findMatchesInDirection(isHorizontal) { /* ... inchangé ... */
+            const matches = []; for (let i = 0; i < GRID_SIZE; i++) { for (let j = 0; j < GRID_SIZE - 2; ) { const gem1 = isHorizontal ? grid[i][j] : grid[j][i]; if (!gem1) { j++; continue; } let currentMatch = [gem1]; for (let k = j + 1; k < GRID_SIZE; k++) { const gem2 = isHorizontal ? grid[i][k] : grid[k][i]; if (gem2 && gem2.type === gem1.type) { currentMatch.push(gem2); } else { break; } } if (currentMatch.length >= 3) { matches.push(currentMatch); } j += currentMatch.length; } } return matches;
+        }
+        
+        function checkGameState() { /* ... inchangé ... */
+            if (gameState.isOver) return; if (gameState.score >= gameState.targetScore) endGame(true); else if (gameState.moves <= 0) endGame(false);
+        }
+
+        function endGame(isWin) { /* ... inchangé ... */
+            gameState.isOver = true; isProcessing = true; const overlay = document.getElementById('end-overlay'); const title = document.getElementById('overlay-title'); const text = document.getElementById('overlay-text'); const button = document.getElementById('restart-button');
+            if (isWin) { playSound('sounds/win.mp3'); const hasNext = currentLevelIndex < levels.length - 1; title.textContent = hasNext ? "Niveau Réussi !" : "Bravo !"; text.textContent = hasNext ? "Prêt pour le prochain défi ?" : "Vous avez terminé tous les niveaux !"; button.textContent = hasNext ? "Niveau Suivant" : "Recommencer"; button.onclick = () => hasNext ? initGame(currentLevelIndex + 1) : initGame(0); }
+            else { playSound('sounds/game-over.mp3'); title.textContent = "Échec !"; text.textContent = "Plus de coups disponibles."; button.textContent = "Réessayer"; button.onclick = () => initGame(currentLevelIndex); }
+            overlay.style.display = 'flex';
+        }
+
+        function updateUI() { /* ... inchangé ... */
+            const levelConfig = levels[currentLevelIndex]; document.getElementById('current-level').textContent = levelConfig.level; document.getElementById('moves-left').textContent = gameState.moves; document.getElementById('current-score').textContent = gameState.score; document.getElementById('score-target').textContent = levelConfig.targetScore;
+        }
+        
+        function updateScore(points) { gameState.score += points; updateUI(); }
+        function getPosition(row, col) { const totalSize = GEM_SIZE + GAP_SIZE; return { top: row * totalSize + GAP_SIZE, left: col * totalSize + GAP_SIZE }; }
+        function getRandomType() { return Math.ceil(Math.random() * GEM_TYPES_COUNT); }
+        function areAdjacent(gem1, gem2) { const dx = Math.abs(gem1.col - gem2.col); const dy = Math.abs(gem1.row - gem2.row); return (dx === 1 && dy === 0) || (dx === 0 && dy === 1); }
+        function isMatchOnStart(r, c) { if (c >= 2 && grid[r][c-1].type === grid[r][c].type && grid[r][c-2].type === grid[r][c].type) return true; if (r >= 2 && grid[r-1][c].type === grid[r][c].type && grid[r-2][c].type === grid[r][c].type) return true; return false; }
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+    </script>
+</body>
+</html>

@@ -1,0 +1,509 @@
+/* --- VARIABLES ET CONFIGURATION GÉNÉRALE --- */
+:root {
+    --color-background: #12002b;
+    --color-primary-glow: #ff00c1;
+    --color-secondary-glow: #00f2ff;
+    --color-tertiary-glow: #fffb00;
+    --font-arcade: 'Press Start 2P', cursive;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--color-background);
+    color: #fff;
+    font-family: Arial, sans-serif;
+    overflow-x: hidden;
+    text-align: center;
+}
+
+/* --- ÉCRAN DE CHARGEMENT --- */
+#loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-background);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    transition: opacity 0.5s ease;
+}
+
+#loader p {
+    font-family: var(--font-arcade);
+    color: var(--color-secondary-glow);
+    text-shadow: 0 0 5px var(--color-secondary-glow);
+    margin-top: 20px;
+    letter-spacing: 4px;
+}
+
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid rgba(0, 242, 255, 0.3);
+    border-top-color: var(--color-secondary-glow);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* --- ARRIÈRE-PLAN ANIMÉ --- */
+.background-grid {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        linear-gradient(rgba(0, 242, 255, 0.2) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 242, 255, 0.2) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: moveGrid 10s linear infinite;
+    z-index: -1;
+}
+
+@keyframes moveGrid {
+    from { background-position: 0 0; }
+    to { background-position: 100px 50px; }
+}
+
+/* --- HEADER ET TITRE "GLITCH" --- */
+header {
+    padding: 60px 20px 40px;
+}
+
+h1.glitch {
+    font-family: var(--font-arcade);
+    font-size: 4rem;
+    color: #fff;
+    position: relative;
+    text-shadow: 
+        0 0 5px var(--color-primary-glow),
+        0 0 10px var(--color-primary-glow),
+        0 0 20px #fff;
+    animation: glitch-effect 3s infinite;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: var(--color-secondary-glow);
+    text-shadow: 0 0 5px var(--color-secondary-glow);
+    margin-top: 10px;
+}
+
+@keyframes glitch-effect {
+  0%, 100% { text-shadow: 0 0 5px var(--color-primary-glow); transform: none; }
+  20%, 24%, 55%, 59% { text-shadow: 2px 2px 5px var(--color-secondary-glow), -2px -2px 5px var(--color-primary-glow); transform: skewX(5deg); }
+  22%, 57% { text-shadow: -2px 2px 5px var(--color-secondary-glow), 2px -2px 5px var(--color-primary-glow); transform: skewX(-5deg); }
+}
+
+/* --- GALERIE DE JEUX --- */
+#game-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 40px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.game-card {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--color-secondary-glow);
+    border-radius: 10px;
+    width: 300px;
+    padding: 20px;
+    box-shadow: 0 0 15px var(--color-secondary-glow), inset 0 0 10px rgba(0, 242, 255, 0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.game-card:hover {
+    transform: translateY(-10px) scale(1.05);
+    box-shadow: 0 0 30px var(--color-primary-glow), inset 0 0 15px rgba(255, 0, 193, 0.5);
+    border-color: var(--color-primary-glow);
+}
+
+.game-card img {
+    width: 100%;
+    border-radius: 5px;
+    border: 1px solid var(--color-secondary-glow);
+}
+
+.game-card h2 {
+    font-family: var(--font-arcade);
+    color: var(--color-tertiary-glow);
+    text-shadow: 0 0 5px var(--color-tertiary-glow);
+    margin: 15px 0 10px;
+    font-size: 1.5rem;
+}
+
+.game-card p {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    height: 60px;
+    margin-bottom: 20px;
+}
+
+.play-button {
+    display: inline-block;
+    background-color: var(--color-primary-glow);
+    color: #000;
+    font-family: var(--font-arcade);
+    text-decoration: none;
+    padding: 12px 25px;
+    border-radius: 5px;
+    font-weight: bold;
+    box-shadow: 0 0 10px var(--color-primary-glow);
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+.play-button:hover {
+    background-color: var(--color-tertiary-glow);
+    color: #000;
+    transform: scale(1.1);
+    box-shadow: 0 0 15px var(--color-tertiary-glow);
+}
+
+
+/* --- STYLES COMMUNS AUX PAGES DE JEU --- */
+.game-container {
+    position: relative;
+    width: 95vw;
+    max-width: 800px;
+    margin: 20px auto;
+    background: #000;
+    border: 2px solid var(--color-secondary-glow);
+    box-shadow: 0 0 20px var(--color-secondary-glow);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game-container canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+.back-button {
+    display: inline-block;
+    color: #000;
+    background-color: var(--color-tertiary-glow);
+    padding: 15px 30px;
+    text-decoration: none;
+    font-family: var(--font-arcade);
+    border-radius: 5px;
+    transition: transform 0.3s;
+    margin-top: 20px;
+}
+
+.back-button:hover {
+    transform: scale(1.1);
+}
+
+/* --- CONTROLES MOBILES (CACHÉS PAR DÉFAUT) --- */
+#mobile-controls {
+    display: none;
+}
+
+
+/* --- MEDIA QUERIES POUR LA RESPONSIVITÉ --- */
+@media (max-width: 768px) {
+    header {
+        padding: 40px 10px 20px;
+    }
+
+    h1.glitch {
+        font-size: 2.5rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    #game-gallery {
+        flex-direction: column;
+        align-items: center;
+        gap: 30px;
+    }
+
+    .game-card {
+        width: 90%;
+    }
+
+    .game-container {
+        width: 95vw;
+        height: auto;
+        padding: 5px;
+        margin: 10px auto;
+    }
+    
+    .back-button {
+        padding: 12px 25px;
+        font-size: 0.9rem;
+    }
+    
+    footer {
+        margin-top: 20px;
+        padding: 20px;
+    }
+
+    /* --- AFFICHAGE DES CONTROLES MOBILES (UNIQUEMENT POUR ÉCRANS TACTILES) --- */
+    @media (pointer: coarse) {
+        #mobile-controls {
+            display: flex; /* Affiche les contrôles */
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            z-index: 200;
+            user-select: none;
+        }
+
+        #mobile-controls button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            font-family: var(--font-arcade);
+            font-size: 1.5rem;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+        #mobile-controls button:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-areas: ". up ." "left . right" ". down .";
+            width: 200px;
+            gap: 10px;
+        }
+        #d-pad-up { grid-area: up; }
+        #d-pad-left { grid-area: left; }
+        #d-pad-right { grid-area: right; }
+        #d-pad-down { grid-area: down; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .action-buttons button {
+            width: 70px;
+            height: 70px;
+            font-size: 1rem;
+            border-radius: 50%;
+        }
+    }
+}
+
+
+
+/* --- STYLES POUR LE MODAL D'INSTALLATION (AVANT : EN JS) --- */
+#install-modal {
+  display: none; /* Géré par JS */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  animation: fadeIn 0.5s ease;
+  backdrop-filter: blur(5px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: var(--color-background);
+  border: 2px solid var(--color-primary-glow);
+  padding: 25px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 0 20px var(--color-primary-glow);
+  max-width: 400px; /* Taille de base pour PC */
+  width: 90%; /* S'adapte, mais avec une limite max */
+  animation: glitch-effect 1.5s infinite;
+}
+
+.modal-content h2 {
+  font-family: var(--font-arcade);
+  color: var(--color-primary-glow);
+  text-shadow: 0 0 5px var(--color-primary-glow);
+  margin-bottom: 15px;
+  font-size: 1.8rem;
+}
+
+.modal-content p {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 25px;
+}
+
+.modal-buttons button {
+  color: #000;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 5px;
+  margin: 5px;
+  font-family: var(--font-arcade);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  font-size: 0.9rem;
+}
+
+#install-yes {
+  background: var(--color-primary-glow);
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+#install-no {
+  background: var(--color-secondary-glow);
+  box-shadow: 0 0 10px var(--color-secondary-glow);
+}
+
+.modal-buttons button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px var(--color-tertiary-glow);
+}
+
+/* --- VERSION MOBILE DU MODAL --- */
+@media (max-width: 768px) {
+  .modal-content h2 {
+    font-size: 1.5rem; /* Titre légèrement plus petit */
+  }
+
+  .modal-content p {
+    font-size: 0.9rem; /* Texte légèrement plus petit */
+  }
+  
+  /* On empile les boutons pour un meilleur accès tactile */
+  .modal-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Espace entre les boutons empilés */
+    align-items: stretch; /* Les boutons prennent toute la largeur */
+  }
+
+  .modal-buttons button {
+    margin: 0; /* On enlève la marge latérale */
+    padding: 15px; /* On augmente la hauteur pour le tactile */
+  }
+}
+
+/* --- BOUTON MUSIQUE GLOBAL (STYLE ON/OFF) --- */
+#music-toggle-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 60px; /* Un peu plus large */
+    height: 30px; /* Moins haut */
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 2px solid var(--color-secondary-glow);
+    border-radius: 15px; /* Pour des bords arrondis */
+    cursor: pointer;
+    z-index: 1002;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 10px var(--color-secondary-glow);
+}
+
+/* Le cercle qui bouge à l'intérieur */
+#music-toggle-btn::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px; /* Position de départ (OFF) */
+    width: 22px;
+    height: 22px;
+    background-color: var(--color-secondary-glow);
+    border-radius: 50%;
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Animation avec rebond */
+    box-shadow: 0 0 8px var(--color-secondary-glow);
+}
+
+#music-toggle-btn:hover {
+    box-shadow: 0 0 20px var(--color-secondary-glow);
+}
+
+/* Style quand la musique est active (ON) */
+#music-toggle-btn.playing {
+    border-color: var(--color-primary-glow);
+    box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+#music-toggle-btn.playing::before {
+    transform: translateX(30px); /* Déplace le cercle vers la droite */
+    background-color: var(--color-primary-glow);
+    box-shadow: 0 0 8px var(--color-primary-glow);
+}
+
+#music-toggle-btn.playing:hover {
+    box-shadow: 0 0 20px var(--color-primary-glow);
+}
+
+/* --- STYLES POUR LE JOYSTICK HORIZONTAL --- */
+@media (pointer: coarse) {
+    #joystick-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed; /* <-- La clé est ici : on le fixe à l'écran */
+    bottom: 20px;    /* <-- On le colle à 20px du bas */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 80px;
+    z-index: 200;
+    user-select: none;
+}
+
+    #joystick-base {
+        width: 180px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid var(--color-secondary-glow);
+        border-radius: 30px;
+        position: relative;
+        box-shadow: 0 0 10px var(--color-secondary-glow);
+    }
+
+    #joystick-knob {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        background: var(--color-secondary-glow);
+        border-radius: 50%;
+        top: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 0 15px var(--color-secondary-glow);
+        transition: transform 0.1s linear; /* Pour un retour en douceur */
+    }
+}

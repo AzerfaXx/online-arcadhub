@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pong - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Styles spécifiques pour Pong */
+        .game-container {
+            position: relative;
+            touch-action: none; 
+        }
+        .game-container canvas {
+            background-color: #000;
+        }
+        
+        #start-screen {
+            position: absolute; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0,0,0,0.7); 
+            color: white; 
+            font-family: 'Press Start 2P', cursive; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            z-index: 200; 
+            flex-direction: column;
+        }
+        #start-screen p {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+        #start-screen button {
+            background-color: var(--color-tertiary-glow); 
+            color: black; 
+            border: none; 
+            padding: 15px 30px; 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 1.2rem; 
+            cursor: pointer; 
+            border-radius: 5px; 
+            transition: transform 0.3s; 
+        }
+        #start-screen button:hover {
+            transform: scale(1.1);
+        }
+
+        #win-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            text-align: center;
+            z-index: 100;
+        }
+        #win-screen h2 {
+            font-size: 2.5rem;
+            text-shadow: 0 0 10px var(--color-tertiary-glow), 0 0 20px var(--color-tertiary-glow);
+            margin-bottom: 20px;
+        }
+        #win-screen p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        #win-screen button {
+            background-color: var(--color-tertiary-glow);
+            color: black;
+            border: none;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: transform 0.3s;
+        }
+        #win-screen button:hover {
+            transform: scale(1.1);
+        }
+
+        /* --- NOUVEAU : Style pour le Joystick Mobile --- */
+        #mobile-joystick-container {
+            display: none; /* Caché par défaut sur PC */
+            position: relative;
+            width: 80px;      /* Largeur de la base */
+            height: 180px;    /* Hauteur de la base (pour le mouvement vertical) */
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 40px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            margin: 20px auto 0; /* Se place sous le bouton "RETOUR" */
+            touch-action: none; /* Important pour le contrôle tactile */
+        }
+
+        #joystick-thumb {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Centre parfaitement le pouce */
+        }
+
+        /* Affiche le joystick uniquement sur les appareils tactiles */
+        @media (pointer: coarse) {
+            #mobile-joystick-container {
+                display: block;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <div class="background-grid"></div>
+    <header>
+        <h1 class="glitch" data-text="PONG">PONG</h1>
+    </header>
+    <main>
+        <div class="game-container">
+            <canvas id="pongCanvas" width="750" height="450"></canvas>
+            
+            <div id="start-screen">
+                <p>BIENVENUE SUR PONG !</p>
+                <button id="startButton">JOUER</button>
+            </div>
+
+            <div id="win-screen">
+                <h2 id="win-message"></h2>
+                <p>Score Final: <span id="final-score"></span></p>
+                <button onclick="restartGame()">REJOUER</button>
+            </div>
+        </div>
+        <a href="index.html" class="back-button">&lt; RETOUR</a>
+    </main>
+
+    <div id="mobile-joystick-container">
+        <div id="joystick-thumb"></div>
+    </div>
+
+
+    <script>
+        // ==================================================================
+        //               BLOC À COPIER-COLLER DANS CHAQUE JEU
+        // ==================================================================
+        const musicPlayer = new Audio('sounds/ambiance.mp3');
+        musicPlayer.loop = true;
+        musicPlayer.volume = 0.3;
+
+        // Sauvegarde le temps de lecture avant de quitter la page pour une lecture fluide
+        window.addEventListener('beforeunload', () => {
+            if (!musicPlayer.paused) {
+                localStorage.setItem('musicCurrentTime', musicPlayer.currentTime);
+            }
+        });
+
+        function playSound(src, volume = 1.0) {
+            const audio = new Audio(src);
+            audio.volume = volume;
+            audio.play();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Son de clic pour tous les boutons de la page ---
+            const clickableElements = document.querySelectorAll('button, a.back-button');
+            clickableElements.forEach(elem => {
+                if (elem.id !== 'music-toggle-btn') {
+                    elem.addEventListener('click', () => {
+                        playSound('sounds/click.mp3');
+                    });
+                }
+            });
+
+            // --- Gestion du bouton de musique d'ambiance ---
+            const musicBtn = document.getElementById('music-toggle-btn');
+            
+            const syncMusicState = () => {
+                if (localStorage.getItem('musicState') === 'playing') {
+                    // Récupère le temps sauvegardé pour reprendre la musique où elle s'est arrêtée
+                    const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0');
+                    musicPlayer.currentTime = savedTime;
+                    musicPlayer.play().catch(e => {}); // Le catch évite les erreurs si l'autoplay est bloqué
+                    musicBtn.classList.add('playing');
+                } else {
+                    musicPlayer.pause();
+                    musicBtn.classList.remove('playing');
+                }
+            };
+            
+            musicBtn.addEventListener('click', () => {
+                if (musicPlayer.paused) {
+                    localStorage.setItem('musicState', 'playing');
+                } else {
+                    localStorage.setItem('musicState', 'paused');
+                    // On supprime le temps sauvegardé quand l'utilisateur met en pause manuellement
+                    localStorage.removeItem('musicCurrentTime');
+                }
+                syncMusicState();
+            });
+
+            syncMusicState();
+        });
+        const joystickContainer = document.getElementById('mobile-joystick-container');
+        const joystickThumb = document.getElementById('joystick-thumb');
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const winScreen = document.getElementById('win-screen');
+        const winMessageElement = document.getElementById('win-message');
+        const finalScoreElement = document.getElementById('final-score');
+        
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('startButton');
+
+        const paddleWidth = 15, paddleHeight = 90;
+        
+        let player = { x: 15, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, score: 0, speed: 7, dy: 0 };
+        
+        // MODIFIÉ : Vitesse max de l'IA réduite
+        let ai = { x: canvas.width - paddleWidth - 15, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, score: 0, maxSpeed: 3.2 };
+        
+        let ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 7, baseSpeed: 1.5, speedX: 1.5, speedY: 1.5 };
+        
+        const initialSpeed = 1.5;
+        
+        let trail = [];
+        const maxTrail = 15;
+        
+        const winningScore = 5;
+        let gameActive = true;
+        let gameStarted = false;
+        let confettiParticles = [];
+        const confettiColors = ['#ff00c1', '#00f2ff', '#fffb00'];
+
+        function startGameLogic() {
+            if (gameStarted) return;
+            gameStarted = true;
+            startScreen.style.display = 'none';
+            restartGame();
+        }
+
+        function drawRect(x, y, w, h, color, glowColor = null) {
+            ctx.fillStyle = color;
+            if (glowColor) {
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 15;
+            }
+            ctx.fillRect(x, y, w, h);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawCircle(x, y, r, color, glowColor = null) {
+            ctx.fillStyle = color;
+            if (glowColor) {
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 15;
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawText(text, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.font = "40px 'Press Start 2P'";
+            ctx.fillText(text, x, y);
+        }
+
+        // Contrôle au clavier (fluide)
+        document.addEventListener('keydown', (e) => {
+            startGameLogic();
+            if (e.key === 'ArrowUp') player.dy = -player.speed;
+            else if (e.key === 'ArrowDown') player.dy = player.speed;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                player.dy = 0;
+            }
+        });
+
+        // Contrôle tactile (direct)
+        function movePaddleWithTouch(e) {
+            e.preventDefault();
+            startGameLogic();
+            const rect = canvas.getBoundingClientRect();
+            const touchY = e.touches[0].clientY - rect.top;
+            player.y = touchY - player.height / 2;
+            player.dy = 0; // Stoppe tout mouvement de clavier en cours
+        }
+
+        canvas.addEventListener('touchstart', movePaddleWithTouch, { passive: false });
+        canvas.addEventListener('touchmove', movePaddleWithTouch, { passive: false });
+        
+        startButton.addEventListener('click', startGameLogic);
+
+        function collision(b, p) { return b.x + b.radius > p.x && b.x - b.radius < p.x + p.width && b.y + b.radius > p.y && b.y - b.radius < p.y + p.height; }
+        
+        function resetBall(scoringPlayer = null) {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.baseSpeed = initialSpeed;
+            ball.speedX = (scoringPlayer === player ? -1 : 1) * ball.baseSpeed;
+            ball.speedY = (Math.random() > 0.5 ? 1 : -1) * (ball.baseSpeed / 2);
+            trail = [];
+        }
+        
+        function createConfetti() {
+            confettiParticles = [];
+            for (let i = 0; i < 150; i++) {
+                confettiParticles.push({
+                    x: Math.random() * canvas.width, y: Math.random() * -canvas.height,
+                    xv: (Math.random() - 0.5) * 4, yv: Math.random() * 5 + 2,
+                    size: Math.random() * 8 + 3, color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+                });
+            }
+        }
+
+        function updateConfetti() {
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                let p = confettiParticles[i];
+                p.x += p.xv; p.y += p.yv; p.yv += 0.05;
+                if (p.y > canvas.height) confettiParticles.splice(i, 1);
+            }
+        }
+
+        function drawConfetti() {
+            for (let p of confettiParticles) {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            }
+        }
+        
+        function endGame() {
+            gameActive = false;
+            const winner = player.score === winningScore;
+            if (winner) {
+                playSound('sounds/win.mp3');
+            } else {
+                playSound('sounds/game-over.mp3', 0.5);
+            }
+            winMessageElement.innerText = winner ? "WIN !" : "GAME OVER";
+            winMessageElement.style.color = winner ? 'var(--color-secondary-glow)' : 'var(--color-primary-glow)';
+            finalScoreElement.innerText = `${player.score} - ${ai.score}`;
+            winScreen.style.display = 'flex';
+            if (winner) createConfetti();
+        }
+        
+        function restartGame() {
+            player.score = 0;
+            ai.score = 0;
+            player.y = canvas.height / 2 - paddleHeight / 2;
+            player.dy = 0;
+            gameActive = true;
+            winScreen.style.display = 'none';
+            confettiParticles = [];
+            resetBall();
+        }
+
+        function update() {
+            if (!gameActive || !gameStarted) return;
+
+            player.y += player.dy;
+
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+            
+            if (player.y < 0) player.y = 0;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+
+            // --- Logique de l'IA moins parfaite (valeurs ajustées) ---
+            const reactionFactor = 0.035; // MODIFIÉ: Réactivité réduite
+            const errorChance = 0.1;   // MODIFIÉ: Chance d'erreur augmentée
+            
+            if (ball.speedX > 0 && Math.random() > errorChance) {
+                const diff = ball.y - (ai.y + ai.height / 2);
+                let movement = diff * reactionFactor;
+                movement = Math.max(-ai.maxSpeed, Math.min(ai.maxSpeed, movement));
+                ai.y += movement;
+            }
+
+            if (ai.y < 0) ai.y = 0;
+            if (ai.y + ai.height > canvas.height) ai.y = canvas.height - ai.height;
+
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.speedY = -ball.speedY;
+                playSound('sounds/hit.mp3', 0.4);
+            }
+
+            let p = (ball.x < canvas.width/2) ? player : ai;
+            if(collision(ball, p)){
+                playSound('sounds/hit.mp3', 0.4);
+                let collidePoint = (ball.y - (p.y + p.height / 2)) / (p.height / 2);
+                let angleRad = (Math.PI / 4) * collidePoint;
+                let direction = (ball.x < canvas.width / 2) ? 1 : -1;
+                ball.baseSpeed = Math.min(15, ball.baseSpeed + 0.5);
+                ball.speedX = direction * ball.baseSpeed * Math.cos(angleRad);
+                ball.speedY = ball.baseSpeed * Math.sin(angleRad);
+            }
+
+            if (ball.x - ball.radius < 0) { 
+                ai.score++; 
+                playSound('sounds/score-pong.mp3');
+                if (ai.score === winningScore) endGame(); else resetBall(ai);
+            } else if (ball.x + ball.radius > canvas.width) {
+                player.score++;
+                playSound('sounds/score-pong.mp3');
+                if (player.score === winningScore) endGame(); else resetBall(player);
+            }
+
+            trail.push({ x: ball.x, y: ball.y });
+            if (trail.length > maxTrail) trail.shift();
+        }
+
+        let dashOffset = 0;
+        function drawCenterLine() {
+            ctx.beginPath();
+            ctx.setLineDash([10, 10]);
+            ctx.lineDashOffset = -dashOffset;
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.strokeStyle = "rgba(0, 242, 255, 0.4)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            dashOffset = (dashOffset + 0.5) % 20;
+        }
+
+        function render() {
+            drawRect(0, 0, canvas.width, canvas.height, "#000");
+            drawCenterLine();
+            drawText(player.score, canvas.width / 4, 60, "WHITE");
+            drawText(ai.score, 3 * canvas.width / 4 - 40, 60, "WHITE");
+            drawRect(player.x, player.y, player.width, player.height, "white", 'var(--color-primary-glow)');
+            drawRect(ai.x, ai.y, ai.width, ai.height, "white", 'var(--color-secondary-glow)');
+            
+            if (gameStarted) {
+                for (let i = 0; i < trail.length; i++) {
+                    const alpha = (i / maxTrail) * 0.5;
+                    const radius = ball.radius * (i / maxTrail);
+                    drawCircle(trail[i].x, trail[i].y, radius, `rgba(255, 255, 255, ${alpha})`);
+                }
+                drawCircle(ball.x, ball.y, ball.radius, "white", 'var(--color-tertiary-glow)');
+            }
+            drawConfetti();
+        }
+
+        function gameLoop() { 
+            update();
+            updateConfetti();
+            render(); 
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
+
+        // --- NOUVEAU : Logique complète du Joystick ---
+        let joystickActive = false;
+        let joystickStartY = 0;
+        let initialPlayerY = 0;
+
+        // Quand on pose le doigt sur le joystick
+        joystickContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startGameLogic();
+            joystickActive = true;
+            joystickStartY = e.touches[0].clientY; // Position Y de départ du doigt
+            initialPlayerY = player.y; // Position de départ de la raquette
+        }, { passive: false });
+
+        // Quand on bouge le doigt (même en dehors du joystick)
+        document.addEventListener('touchmove', (e) => {
+            if (!joystickActive) return; // Ne fait rien si le joystick n'est pas actif
+            e.preventDefault();
+
+            const currentY = e.touches[0].clientY;
+            const deltaY = currentY - joystickStartY; // Différence de position
+            
+            // Met à jour la position de la raquette avec une certaine sensibilité
+            const sensitivity = 1.5;
+            player.y = initialPlayerY + (deltaY * sensitivity);
+            player.dy = 0; // Annule le mouvement du clavier pour éviter les conflits
+
+            // Met à jour la position visuelle du pouce du joystick
+            const containerHeight = joystickContainer.clientHeight;
+            const thumbHeight = joystickThumb.clientHeight;
+            // Limite le déplacement du pouce pour qu'il ne sorte pas de sa base
+            const maxThumbDelta = (containerHeight / 2) - (thumbHeight / 2) - 5;
+            let thumbDeltaY = deltaY * 0.5; // Le pouce bouge moins vite que le doigt
+            thumbDeltaY = Math.max(-maxThumbDelta, Math.min(maxThumbDelta, thumbDeltaY));
+            joystickThumb.style.transform = `translate(-50%, -50%) translateY(${thumbDeltaY}px)`;
+
+        }, { passive: false });
+
+        // Quand on relâche le doigt
+        document.addEventListener('touchend', (e) => {
+            if (!joystickActive) return;
+            joystickActive = false;
+            // Réinitialise la position du pouce au centre
+            joystickThumb.style.transform = 'translate(-50%, -50%)';
+        });
+    </script>
+</body>
+</html>

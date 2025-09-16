@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Glow Breaker - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        .game-container { max-width: 600px; max-height: 800px; padding: 0; }
+        canvas { display: block; background-color: #0d0026; touch-action: none; }
+        .game-ui {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+            font-family: var(--font-arcade);
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px var(--color-secondary-glow);
+            pointer-events: none; /* Pour ne pas gêner les clics */
+        }
+        #overlay-screen {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            color: white; font-family: var(--font-arcade);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+            z-index: 100;
+        }
+        #overlay-screen h2 { font-size: 2.5rem; margin-bottom: 20px; }
+        #overlay-screen p { font-size: 1.2rem; margin-bottom: 30px; line-height: 1.5; }
+        #overlay-screen button {
+            background-color: var(--color-tertiary-glow); color: black; border: none;
+            padding: 15px 30px; font-family: var(--font-arcade); font-size: 1rem;
+            cursor: pointer; border-radius: 5px;
+            box-shadow: 0 0 10px var(--color-tertiary-glow);
+        }
+
+        /* ============== DÉBUT DU CSS AJOUTÉ ============== */
+        #victory-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(12, 0, 31, 0.9);
+            backdrop-filter: blur(5px);
+            color: white;
+            font-family: var(--font-arcade);
+            display: none; /* Caché par défaut */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 200;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .trophy-container {
+            animation: trophy-pop-in 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .trophy-svg {
+            width: 120px;
+            overflow: visible; /* Important pour que le filtre glow soit visible */
+        }
+
+        .victory-title {
+            font-size: 3rem;
+            color: var(--color-tertiary-glow);
+            text-shadow: 0 0 15px var(--color-tertiary-glow);
+            animation: text-glow 2s infinite alternate;
+            margin: 20px 0 10px 0;
+        }
+
+        .victory-text {
+            font-size: 1rem;
+            color: var(--color-secondary-glow);
+            text-shadow: 0 0 8px var(--color-secondary-glow);
+            margin-bottom: 20px;
+        }
+
+        .victory-score {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+
+        #victory-replay-button {
+            background-color: var(--color-primary-glow);
+            color: black;
+            border: none;
+            padding: 15px 30px;
+            font-family: var(--font-arcade);
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 0 15px var(--color-primary-glow);
+            transition: transform 0.2s ease;
+        }
+
+        #victory-replay-button:hover {
+            transform: scale(1.1);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes trophy-pop-in {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            70% { transform: scale(1.1) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        @keyframes text-glow {
+            from { text-shadow: 0 0 10px var(--color-tertiary-glow), 0 0 20px #fff; }
+            to { text-shadow: 0 0 20px var(--color-tertiary-glow), 0 0 40px var(--color-tertiary-glow); }
+        }
+        /* =============== FIN DU CSS AJOUTÉ =============== */
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <div class="background-grid"></div>
+    <header>
+        <h1 class="glitch" data-text="GLOW BREAKER">GLOW BREAKER</h1>
+    </header>
+    <main style="padding-bottom: 150px;">
+        <div class="game-container">
+            <canvas id="gameCanvas"></canvas>
+            <div class="game-ui">
+                <div id="score">SCORE: 0</div>
+                <div id="level">ROUND: 1</div>
+                <div id="lives">VIES: ♥ ♥ ♥</div>
+            </div>
+            <div id="overlay-screen">
+                <h2 id="overlay-title">GLOW BREAKER</h2>
+                <p id="overlay-text">Utilisez la souris, votre doigt ou les flèches pour déplacer la barre.<br>Cliquez ou appuyez sur ESPACE pour lancer.</p>
+                <button id="start-button">JOUER</button>
+            </div>
+            <div id="victory-screen">
+                <div class="trophy-container">
+                    <svg class="trophy-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 125">
+                        <defs>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <path fill="#FFFB00" d="M87.5,12.5H68.75V0h-37.5v12.5H12.5C5.6,12.5,0,18.1,0,25v18.75C0,50,5.6,56.25,12.5,56.25h6.25v18.75 c0,9.66,7.84,17.5,17.5,17.5h27.5c9.66,0,17.5-7.84,17.5-17.5V56.25h6.25C94.4,56.25,100,50,100,43.75V25 C100,18.1,94.4,12.5,87.5,12.5z M81.25,87.5h-62.5V75h62.5V87.5z" filter="url(#glow)"/>
+                        <rect x="18.75" y="100" fill="#FFFB00" width="62.5" height="12.5" filter="url(#glow)"/>
+                    </svg>
+                </div>
+                <h2 class="victory-title">BRAVO !</h2>
+                <p class="victory-text">Vous avez terminé GLOW BREAKER !</p>
+                <p class="victory-score">Score final : <span id="victory-final-score">0</span></p>
+                <button id="victory-replay-button">REJOUER</button>
+            </div>
+        </div>
+        <div id="mobile-controls">
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-knob"></div>
+                </div>
+            </div>
+        </div>
+        <a href="index.html" class="back-button">&lt; RETOUR</a>
+        
+    </main>
+
+    <script>
+        // ==================================================================
+        //               BLOC AUDIO GLOBAL
+        // ==================================================================
+        const musicPlayer = new Audio('sounds/ambiance.mp3');
+        musicPlayer.loop = true; musicPlayer.volume = 0.3;
+        window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
+        function playSound(src, volume = 1.0) { const audio = new Audio(src); audio.volume = volume; audio.play().catch(e => {}); }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('button, a.back-button').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', () => playSound('sounds/click.mp3')); });
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
+            musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
+            syncMusicState();
+        });
+
+        // ==================================================================
+        //                       LOGIQUE DU JEU "GLOW BREAKER"
+        // ==================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay-screen');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayText = document.getElementById('overlay-text');
+        const startButton = document.getElementById('start-button');
+        const victoryScreen = document.getElementById('victory-screen');
+        const victoryFinalScore = document.getElementById('victory-final-score');
+        const victoryReplayButton = document.getElementById('victory-replay-button');
+        
+        const scoreUI = document.getElementById('score');
+        const levelUI = document.getElementById('level');
+        const livesUI = document.getElementById('lives');
+        
+        canvas.width = 600;
+        canvas.height = 800;
+
+        let paddle, balls, bricks, particles, powerUps;
+        let score, lives, level, highscore, gameActive, gameStarted;
+        let rightPressed = false, leftPressed = false;
+
+        const PADDLE_HEIGHT = 20, PADDLE_SPEED = 8, BALL_RADIUS = 10, BALL_SPEED = 6;
+        const BRICK_WIDTH = 65, BRICK_HEIGHT = 25, BRICK_PADDING = 10;
+        const BRICK_COLORS = ["#FF00C1", "#00F2FF", "#FFFB00"]; // Magenta, Cyan, Jaune
+
+        const levelLayouts = [
+            [ // Niveau 1: Le Classique
+                [1,1,1,1,1,1,1], [1,2,2,2,2,2,1], [1,2,3,3,3,2,1], [1,2,3,0,3,2,1],
+                [1,2,3,3,3,2,1], [1,2,2,2,2,2,1], [1,1,1,1,1,1,1]
+            ],
+            [ // Niveau 2: La Pyramide Inversée
+                [0,3,3,3,3,3,0], [3,2,2,2,2,2,3], [3,2,1,1,1,2,3], [3,2,1,0,1,2,3],
+                [0,3,2,1,2,3,0], [0,0,3,2,3,0,0], [0,0,0,3,0,0,0]
+            ],
+            [ // Niveau 3: Le Croisement
+                [2,2,0,1,0,2,2], [2,0,3,1,3,0,2], [0,3,1,1,1,3,0], [3,1,1,1,1,1,3],
+                [0,3,1,1,1,3,0], [2,0,3,1,3,0,2], [2,2,0,1,0,2,2]
+            ],
+            [ // Niveau 4: La Forteresse
+                [1,1,1,1,1,1,1], [1,2,2,2,2,2,1], [1,2,0,0,0,2,1], [1,2,0,3,0,2,1],
+                [1,2,0,0,0,2,1], [1,2,2,3,2,2,1], [1,1,1,3,1,1,1]
+            ],
+            [ // Niveau 5: Le Damier
+                [1,2,1,2,1,2,1], [2,1,2,1,2,1,2], [1,2,1,2,1,2,1], [2,1,2,1,2,1,2],
+                [1,2,3,2,3,2,1], [2,3,2,3,2,3,2], [3,2,3,2,3,2,3]
+            ],
+            [ // Niveau 6: Les Strates
+                [1,1,1,1,1,1,1], [2,2,2,2,2,2,2], [3,3,3,3,3,3,3], [1,1,1,1,1,1,1],
+                [2,2,2,2,2,2,2], [3,3,3,3,3,3,3], [1,1,1,1,1,1,1]
+            ],
+            [ // Niveau 7: Les Barrières
+                [3,3,0,0,0,3,3], [3,3,0,0,0,3,3], [2,2,2,2,2,2,2], [2,2,2,2,2,2,2],
+                [1,1,1,1,1,1,1], [1,1,1,1,1,1,1], [0,0,2,2,2,0,0], [0,0,2,2,2,0,0]
+            ],
+            [ // Niveau 8: Le Labyrinthe
+                [1,1,1,0,1,1,1], [1,0,1,0,1,0,1], [1,0,1,1,1,0,1], [1,0,0,0,0,0,1],
+                [2,2,2,1,2,2,2], [2,0,2,0,2,0,2], [2,0,2,2,2,0,2], [3,3,3,0,3,3,3]
+            ],
+            [ // Niveau 9: Le Mur Dense
+                [3,1,3,1,3,1,3], [1,2,1,2,1,2,1], [3,1,3,1,3,1,3], [1,2,1,2,1,2,1],
+                [3,1,3,1,3,1,3], [1,2,1,2,1,2,1], [3,1,3,1,3,1,3], [1,2,1,2,1,2,1]
+            ],
+            [ // Niveau 10: Le Grand Final
+                [1,2,3,1,3,2,1], [2,3,1,2,1,3,2], [3,1,2,3,2,1,3], [1,2,3,1,3,2,1],
+                [2,3,1,2,1,3,2], [3,1,2,3,2,1,3], [1,2,3,1,3,2,1], [2,3,1,2,1,3,2],
+                [3,1,2,3,2,1,3], [1,2,3,1,3,2,1]
+            ]
+        ];
+
+        function init() {
+            score = 0; lives = 3; level = 1; gameActive = false; gameStarted = false;
+            highscore = localStorage.getItem('glowBreakerHighscore') || 0;
+            
+            overlay.style.display = 'flex';
+            victoryScreen.style.display = 'none'; // Assurez-vous que l'écran de victoire est caché
+            overlayTitle.textContent = "GLOW BREAKER";
+            overlayText.innerHTML = "Utilisez la souris, votre doigt ou les flèches pour déplacer la barre.<br>Cliquez ou appuyez sur ESPACE pour lancer.";
+            startButton.textContent = "JOUER";
+            startButton.onclick = startGame;
+            
+            updateUI();
+            resetPaddleAndBall();
+            loadLevel(level);
+        }
+
+        function startGame() {
+            if (gameStarted) return;
+            gameStarted = true; gameActive = true;
+            overlay.style.display = 'none';
+        }
+
+        function resetPaddleAndBall() {
+            paddle = { x: canvas.width / 2 - 100 / 2, y: canvas.height - 40, width: 100, height: PADDLE_HEIGHT, speed: PADDLE_SPEED, dx: 0 };
+            balls = [{ x: paddle.x + paddle.width / 2, y: paddle.y - BALL_RADIUS, radius: BALL_RADIUS, speedX: 0, speedY: 0, stuck: true, trail: [] }];
+            particles = []; powerUps = [];
+        }
+
+        function loadLevel(levelNum) {
+            bricks = [];
+            const layout = levelLayouts[levelNum - 1];
+            if (!layout) {
+                endGame(true); // Gagne la partie si plus de niveaux
+                return;
+            }
+            const BRICK_ROW_COUNT = layout.length;
+            const BRICK_COLUMN_COUNT = layout[0].length;
+            const offsetTop = 80;
+            const totalBrickWidth = BRICK_COLUMN_COUNT * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
+            const offsetLeft = (canvas.width - totalBrickWidth) / 2;
+            
+            for (let r = 0; r < BRICK_ROW_COUNT; r++) {
+                for (let c = 0; c < BRICK_COLUMN_COUNT; c++) {
+                    if (layout[r][c] > 0) {
+                        let powerUpType = null;
+                        if (Math.random() < 0.15) { powerUpType = Math.random() < 0.6 ? 'large_paddle' : 'multi_ball'; }
+                        bricks.push({
+                            x: offsetLeft + c * (BRICK_WIDTH + BRICK_PADDING), y: offsetTop + r * (BRICK_HEIGHT + BRICK_PADDING),
+                            width: BRICK_WIDTH, height: BRICK_HEIGHT, color: BRICK_COLORS[layout[r][c] - 1], status: 1, powerUp: powerUpType
+                        });
+                    }
+                }
+            }
+        }
+
+        function updateUI() {
+            scoreUI.textContent = `SCORE: ${score}`;
+            levelUI.textContent = `ROUND: ${level}`;
+            livesUI.innerHTML = `VIES: ${'♥ '.repeat(lives)}`;
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, size: Math.random() * 3 + 1, color: color, life: 50 });
+            }
+        }
+
+        function nextLevel() {
+            // ON VÉRIFIE D'ABORD SI C'ÉTAIT LE DERNIER NIVEAU
+            if (level >= levelLayouts.length) {
+                endGame(true); // Si oui, on lance l'écran de victoire final
+                return;        // Et on arrête la fonction ici
+            }
+
+            // Si ce n'est pas la fin, on continue normalement
+            level++;
+            playSound('sounds/win.mp3', 0.4);
+            overlayTitle.textContent = `ROUND ${level}`;
+            overlayText.textContent = "Préparez-vous !";
+            overlay.style.display = 'flex';
+            startButton.style.display = 'none';
+            
+            gameActive = false;
+            
+            setTimeout(() => {
+                resetPaddleAndBall();
+                loadLevel(level);
+                updateUI();
+                overlay.style.display = 'none';
+                startButton.style.display = 'block';
+                gameActive = true;
+            }, 2000);
+        }
+
+        function endGame(isWin) {
+            gameActive = false;
+            gameStarted = false;
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('glowBreakerHighscore', highscore);
+            }
+            
+            if (isWin) {
+                // AFFICHE LE NOUVEL ÉCRAN DE VICTOIRE FINAL
+                playSound('sounds/win.mp3');
+                victoryFinalScore.textContent = score;
+                victoryScreen.style.display = 'flex';
+                victoryReplayButton.onclick = () => {
+                    location.reload();
+                };
+            } else {
+                // Affiche l'écran Game Over classique
+                playSound('sounds/game-over.mp3', 0.5);
+                overlay.style.display = 'flex';
+                overlayTitle.textContent = "GAME OVER";
+                overlayText.innerHTML = `Score: ${score}<br>High Score: ${highscore}`;
+                startButton.textContent = "REJOUER";
+                startButton.onclick = () => {
+                    location.reload();
+                };
+            }
+        }
+
+        function loseLife() {
+            lives--;
+            updateUI();
+            if (lives <= 0) { endGame(false); } 
+            else { playSound('sounds/died-space.mp3', 0.3); resetPaddleAndBall(); }
+        }
+        
+        function update() {
+            if (!gameActive) return;
+
+            paddle.x += paddle.dx;
+            if (paddle.x < 0) paddle.x = 0;
+            if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                if (ball.stuck) { ball.x = paddle.x + paddle.width / 2; ball.y = paddle.y - ball.radius; continue; }
+                ball.x += ball.speedX; ball.y += ball.speedY;
+                ball.trail.push({x: ball.x, y: ball.y});
+                if(ball.trail.length > 10) ball.trail.shift();
+                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) { ball.speedX = -ball.speedX; playSound('sounds/hit.mp3', 0.2); }
+                if (ball.y - ball.radius < 0) { ball.speedY = -ball.speedY; playSound('sounds/hit.mp3', 0.2); }
+                if (ball.y + ball.radius > canvas.height) { balls.splice(i, 1); if (balls.length === 0) { loseLife(); } continue; }
+                if (ball.y + ball.radius > paddle.y && ball.y - ball.radius < paddle.y + paddle.height && ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+                    let collidePoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                    let angle = collidePoint * (Math.PI / 3);
+                    ball.speedX = BALL_SPEED * Math.sin(angle); ball.speedY = -BALL_SPEED * Math.cos(angle);
+                    ball.y = paddle.y - ball.radius; playSound('sounds/hit.mp3', 0.4);
+                }
+                for (let j = bricks.length - 1; j >= 0; j--) {
+                    let b = bricks[j];
+                    if (b.status === 1 && ball.x > b.x && ball.x < b.x + b.width && ball.y > b.y && ball.y < b.y + b.height) {
+                        ball.speedY = -ball.speedY; b.status = 0; score += 100;
+                        createParticles(ball.x, ball.y, b.color); playSound('sounds/explosion.mp3', 0.2);
+                        if (b.powerUp) {
+                            powerUps.push({ x: b.x + b.width / 2, y: b.y, type: b.powerUp, size: 20, speedY: 2, text: b.powerUp === 'large_paddle' ? 'L' : '+' });
+                        }
+                        updateUI();
+                    }
+                }
+            }
+            
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let p = powerUps[i]; p.y += p.speedY;
+                if (p.y > paddle.y && p.x > paddle.x && p.x < paddle.x + paddle.width) {
+                    playSound('sounds/coin.mp3', 0.5);
+                    if (p.type === 'large_paddle') { paddle.width = 150; setTimeout(() => paddle.width = 100, 8000); } 
+                    else if (p.type === 'multi_ball') { balls.push({ x: paddle.x + paddle.width / 2, y: paddle.y - BALL_RADIUS, radius: BALL_RADIUS, speedX: -BALL_SPEED * 0.5, speedY: -BALL_SPEED * 0.8, stuck: false, trail: [] }); }
+                    powerUps.splice(i, 1);
+                }
+                if (p.y > canvas.height) powerUps.splice(i, 1);
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--; if (p.life <= 0) particles.splice(i, 1); }
+            if (bricks.every(b => b.status === 0)) { nextLevel(); }
+        }
+
+        function draw() {
+            if (!paddle) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00F2FF"; ctx.shadowColor = "#00F2FF"; ctx.shadowBlur = 15;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            
+            [...balls].forEach(ball => {
+                for(let i=0; i < ball.trail.length; i++) {
+                    ctx.beginPath();
+                    if (ball.trail[i]) {
+                       ctx.arc(ball.trail[i].x, ball.trail[i].y, ball.radius * (i / ball.trail.length), 0, Math.PI*2);
+                       ctx.fillStyle = `rgba(255, 255, 0, ${i / ball.trail.length * 0.5})`;
+                       ctx.fill();
+                    }
+                }
+                ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = "#FFFB00"; ctx.shadowColor = "#FFFB00"; ctx.shadowBlur = 20;
+                ctx.fill(); ctx.closePath();
+            });
+            
+            ctx.shadowBlur = 0;
+            bricks.forEach(b => { if (b.status === 1) { ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10; ctx.fillRect(b.x, b.y, b.width, b.height); ctx.shadowBlur = 0; } });
+            particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); });
+            powerUps.forEach(p => {
+                ctx.fillStyle = "#39FF14"; ctx.shadowColor = "#39FF14"; ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0; ctx.fillStyle = "black"; ctx.font = "bold 12px 'Press Start 2P'";
+                ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(p.text, p.x, p.y);
+            });
+            requestAnimationFrame(draw);
+        }
+        
+        function launchBall() {
+            if (!gameActive) return;
+            balls.forEach(ball => { if (ball.stuck) { playSound('sounds/swoosh.mp3', 0.3); ball.speedY = -BALL_SPEED; ball.speedX = (Math.random() - 0.5) * 4; ball.stuck = false; } });
+        }
+
+        document.addEventListener("keydown", (e) => { if (e.key === "Right" || e.key === "ArrowRight") rightPressed = true; else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = true; else if (e.key === " ") launchBall(); updatePaddleDx(); });
+        document.addEventListener("keyup", (e) => { if (e.key === "Right" || e.key === "ArrowRight") rightPressed = false; else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = false; updatePaddleDx(); });
+        function updatePaddleDx() { if (rightPressed) paddle.dx = paddle.speed; else if (leftPressed) paddle.dx = -paddle.speed; else paddle.dx = 0; }
+        canvas.addEventListener("mousemove", (e) => { let relativeX = e.clientX - canvas.getBoundingClientRect().left; if (relativeX > 0 && relativeX < canvas.width) { paddle.x = relativeX - paddle.width / 2; } });
+        canvas.addEventListener("click", launchBall);
+    
+        // --- AJOUTEZ CE BLOC POUR LA GESTION DU JOYSTICK ---
+        const joystickContainer = document.getElementById('joystick-container');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let touchStartX = 0;
+        const maxMove = 60; // Déplacement maximal du joystick
+
+        joystickContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            // On lance la balle au premier contact, comme avec l'ancien système
+            launchBall();
+        }, { passive: false });
+
+        joystickContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const currentX = e.touches[0].clientX;
+            let deltaX = currentX - touchStartX;
+
+            deltaX = Math.max(-maxMove, Math.min(maxMove, deltaX));
+            joystickKnob.style.transform = `translateX(calc(-50% + ${deltaX}px))`;
+
+            if (deltaX < -10) {
+                leftPressed = true;
+                rightPressed = false;
+            } else if (deltaX > 10) {
+                leftPressed = false;
+                rightPressed = true;
+            } else {
+                leftPressed = false;
+                rightPressed = false;
+            }
+            updatePaddleDx(); // On met à jour la direction du paddle
+        }, { passive: false });
+
+        joystickContainer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            joystickKnob.style.transform = `translateX(-50%)`;
+            leftPressed = false;
+            rightPressed = false;
+            updatePaddleDx(); // On stoppe le paddle
+        });
+
+        init();
+        setInterval(update, 1000 / 60);
+        draw();
+    </script>
+</body>
+</html>
