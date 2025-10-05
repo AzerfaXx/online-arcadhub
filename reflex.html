@@ -12,14 +12,14 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: calc(100vh - 200px); /* Prend de la hauteur */
+            min-height: calc(100vh - 200px); /* Prend de la hauteur */
             padding-bottom: 60px;
         }
         #game-box {
             width: 90vw;
             max-width: 800px;
-            height: 60vh;
-            max-height: 500px;
+            min-height: 60vh; /* min-height pour s'adapter au contenu */
+            max-height: 600px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -28,22 +28,52 @@
             color: white;
             border-radius: 15px;
             cursor: pointer;
-            user-select: none; /* Empêche la sélection de texte */
+            user-select: none;
             transition: background-color 0.1s ease-in-out;
             border: 4px solid;
             box-shadow: 0 0 20px;
+            padding: 20px;
         }
         #status-text {
-            font-size: clamp(1.5rem, 5vw, 3rem); /* Texte responsive */
+            font-size: clamp(1.5rem, 5vw, 2.5rem); /* Texte responsive */
             line-height: 1.4;
             text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
         #status-text span {
             display: block;
-            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-size: clamp(1rem, 3vw, 1.2rem);
             margin-top: 15px;
             opacity: 0.8;
         }
+        /* NOUVEAUX STYLES POUR LE CLASSEMENT ET LE FORMULAIRE */
+        #status-text input, #status-text button {
+            font-family: var(--font-arcade);
+            font-size: 1rem;
+            padding: 10px 15px;
+            text-align: center;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: block;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #status-text input {
+            background: rgba(0,0,0,0.5);
+            border: 2px solid var(--color-secondary-glow);
+            color: white;
+        }
+        #status-text button {
+            background-color: var(--color-tertiary-glow);
+            color: black;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--color-tertiary-glow);
+        }
+         #leaderboard-container { margin-top: 20px; }
+         #leaderboard { list-style-type: decimal; padding-left: 40px; font-size: 0.8rem; text-align: left; line-height: 1.6; }
+         #leaderboard li::marker { color: var(--color-secondary-glow); }
+         #leaderboard li span { color: var(--color-tertiary-glow); float: right; }
     </style>
 </head>
 <body>
@@ -60,20 +90,83 @@
     </main>
 
     <script>
-        // --- BLOC AUDIO GLOBAL (COPIÉ-COLLÉ) ---
+        // --- BLOC AUDIO GLOBAL (INCHANGÉ) ---
         const musicPlayer = new Audio('sounds/ambiance.mp3');
         musicPlayer.loop = true; musicPlayer.volume = 0.3;
         window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
         function playSound(src, volume = 1.0) { const audio = new Audio(src); audio.volume = volume; audio.play(); }
         document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('button, a.back-button, #game-box').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', () => playSound('sounds/click.mp3')); });
+            document.querySelectorAll('button, a.back-button, #game-box').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', (e) => { if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') playSound('sounds/click.mp3'); }); });
             const musicBtn = document.getElementById('music-toggle-btn');
             const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
             musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
             syncMusicState();
         });
 
-        // --- LOGIQUE DU JEU REFLEX ---
+        // --- NOUVEAU : GESTION DU CLASSEMENT ---
+        const GAME_NAME = "Reflex";
+        const API_BASE_URL = "https://online-arcadhub.onrender.com";
+        let currentPlayerName = localStorage.getItem('reflexPlayerName') || "";
+        let lastScore = 0;
+
+        async function fetchAndDisplayLeaderboard(container) {
+            container.innerHTML = "<p>Chargement...</p>";
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/scores/${GAME_NAME}`);
+                if (!response.ok) throw new Error('Could not fetch scores');
+                const scores = await response.json();
+                let content = "<h3>CLASSEMENT TOP 10</h3>";
+                if (scores.length > 0) {
+                    content += "<ol id='leaderboard'>";
+                    scores.forEach(s => {
+                        content += `<li>${s.playerName} <span>${s.score} ms</span></li>`;
+                    });
+                    content += "</ol>";
+                } else {
+                    content += "<p>Soyez le premier !</p>";
+                }
+                container.innerHTML = content;
+            } catch (error) {
+                console.error("Erreur de chargement du classement:", error);
+                container.innerHTML = "<h3>CLASSEMENT</h3><p>Indisponible.</p>";
+            }
+        }
+        
+        async function submitScore() {
+            const playerNameInput = document.getElementById('playerNameInput');
+            const submitButton = document.getElementById('submitButton');
+            const name = playerNameInput.value.trim();
+
+            if (name.length < 3) {
+                alert("Le pseudo doit contenir au moins 3 caractères.");
+                playerNameInput.focus();
+                return;
+            }
+            
+            currentPlayerName = name;
+            localStorage.setItem('reflexPlayerName', currentPlayerName);
+            submitButton.disabled = true;
+            submitButton.textContent = "ENVOI...";
+
+            try {
+                await fetch(`${API_BASE_URL}/api/scores`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerName: currentPlayerName,
+                        score: lastScore,
+                        gameName: GAME_NAME
+                    }),
+                });
+            } catch (error) {
+                console.error("Erreur lors de la soumission du score:", error);
+            }
+            
+            initGame(); // Retourne à l'écran d'accueil avec le classement à jour
+        }
+
+
+        // --- LOGIQUE DU JEU REFLEX (MODIFIÉE) ---
         const gameBox = document.getElementById('game-box');
         const statusText = document.getElementById('status-text');
 
@@ -81,45 +174,66 @@
         let startTime;
         let timeoutId;
 
-        function setScreen(state, text, subtext = '', color, borderColor) {
+        function setScreen(state, htmlContent, color, borderColor, addClickListener = true) {
             gameState = state;
-            statusText.innerHTML = `${text}${subtext ? `<span>${subtext}</span>` : ''}`;
+            statusText.innerHTML = htmlContent;
             gameBox.style.backgroundColor = color;
             gameBox.style.borderColor = borderColor;
             gameBox.style.boxShadow = `0 0 20px ${borderColor}`;
+            // Gère si le clic sur la boîte est actif ou non (pour éviter les conflits avec les boutons)
+             gameBox.style.cursor = addClickListener ? 'pointer' : 'default';
         }
 
-        function initGame() {
+        async function initGame() {
             clearTimeout(timeoutId);
-            setScreen('waiting', 'Testez vos réflexes', 'Cliquez pour commencer', '#1f2a40', 'var(--color-secondary-glow)');
+            const leaderboardContainer = '<div id="leaderboard-container"></div>';
+            setScreen('waiting', `Testez vos réflexes<span>Cliquez pour commencer</span>${leaderboardContainer}`, '#1f2a40', 'var(--color-secondary-glow)');
+            await fetchAndDisplayLeaderboard(document.getElementById('leaderboard-container'));
         }
 
         function startGame() {
-            setScreen('ready', 'Attendez le vert...', '', '#c0392b', '#ff4f42'); // Rouge
-            const randomDelay = Math.random() * 4000 + 1000; // Délai entre 1 et 5 secondes
+            setScreen('ready', 'Attendez le vert...', '#c0392b', '#ff4f42');
+            const randomDelay = Math.random() * 4000 + 1000;
             timeoutId = setTimeout(showGreen, randomDelay);
         }
 
         function showGreen() {
-            setScreen('timing', 'CLIQUEZ !', '', '#27ae60', '#39FF14'); // Vert
+            setScreen('timing', 'CLIQUEZ !', '#27ae60', '#39FF14');
             startTime = Date.now();
         }
 
-        function endGame(time) {
+        async function endGame(time) {
             playSound('sounds/coin.mp3', 0.6);
-            setScreen('result', `${time} ms`, 'Cliquez pour rejouer', '#34495e', 'var(--color-tertiary-glow)');
+            lastScore = time; // Sauvegarde le score pour l'envoi
+
+            const leaderboardContainer = '<div id="leaderboard-container"></div>';
+            const formHTML = `
+                <h2>${time} ms</h2>
+                <span>Entrez votre pseudo (3 car. min)</span>
+                <input type="text" id="playerNameInput" placeholder="PSEUDO" value="${currentPlayerName}" maxlength="15">
+                <button id="submitButton">ENREGISTRER & REJOUER</button>
+                ${leaderboardContainer}
+            `;
+            setScreen('result', formHTML, '#34495e', 'var(--color-tertiary-glow)', false);
+            
+            // Ajoute l'événement au bouton et récupère le classement
+            document.getElementById('submitButton').onclick = submitScore;
+            await fetchAndDisplayLeaderboard(document.getElementById('leaderboard-container'));
         }
         
         function handleFalseStart() {
             clearTimeout(timeoutId);
             playSound('sounds/hit.mp3', 0.5);
-            setScreen('result', 'Trop tôt !', 'Cliquez pour réessayer', '#8e44ad', 'var(--color-primary-glow)');
+            setScreen('result', 'Trop tôt !<span>Cliquez pour réessayer</span>', '#8e44ad', 'var(--color-primary-glow)');
         }
 
-        gameBox.addEventListener('click', () => {
+        gameBox.addEventListener('click', (e) => {
+            // Empêche le clic de se propager si on clique sur un input ou un bouton
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+
             switch (gameState) {
                 case 'waiting':
-                case 'result':
+                case 'result': // 'result' est maintenant aussi un état de fin de partie simple (faux départ)
                     startGame();
                     break;
                 case 'ready':
@@ -132,7 +246,7 @@
             }
         });
 
-        initGame(); // Initialise le jeu au chargement
+        initGame();
     </script>
 </body>
 </html>
