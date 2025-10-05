@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu en cours - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css"> <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Styles spécifiques pour la page de jeu */
+        .game-container {
+            width: 80vw;
+            height: 70vh;
+            margin: 40px auto;
+            background: #000;
+            border: 2px solid var(--color-secondary-glow);
+            box-shadow: 0 0 20px var(--color-secondary-glow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: var(--font-arcade);
+            color: white;
+            font-size: 1.5rem;
+        }
+        .back-button {
+            display: inline-block;
+            color: #000;
+            background-color: var(--color-tertiary-glow);
+            padding: 15px 30px;
+            text-decoration: none;
+            font-family: var(--font-arcade);
+            border-radius: 5px;
+            transition: transform 0.3s;
+        }
+        .back-button:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-grid"></div>
+
+    <header>
+        <h1 class="glitch" data-text="EN JEU...">EN JEU...</h1>
+    </header>
+
+    <main>
+        <div class="game-container">
+            <p>L'IFRAME OU LE CANVAS DE TON JEU VIENT ICI</p>
+        </div>
+        <a href="index.html" class="back-button">&lt; RETOUR</a>
+    </main>
+
+</body>
+</html>

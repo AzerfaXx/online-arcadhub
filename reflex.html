@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Reflex - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        main {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: calc(100vh - 200px); /* Prend de la hauteur */
+            padding-bottom: 60px;
+        }
+        #game-box {
+            width: 90vw;
+            max-width: 800px;
+            height: 60vh;
+            max-height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-family: var(--font-arcade);
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            user-select: none; /* Empêche la sélection de texte */
+            transition: background-color 0.1s ease-in-out;
+            border: 4px solid;
+            box-shadow: 0 0 20px;
+        }
+        #status-text {
+            font-size: clamp(1.5rem, 5vw, 3rem); /* Texte responsive */
+            line-height: 1.4;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        #status-text span {
+            display: block;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            margin-top: 15px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <div class="background-grid"></div>
+    <header>
+        <h1 class="glitch" data-text="REFLEX">REFLEX</h1>
+    </header>
+    <main>
+        <div id="game-box">
+            <div id="status-text"></div>
+        </div>
+        <a href="index.html" class="back-button" style="margin-top: 30px;">&lt; RETOUR</a>
+    </main>
+
+    <script>
+        // --- BLOC AUDIO GLOBAL (COPIÉ-COLLÉ) ---
+        const musicPlayer = new Audio('sounds/ambiance.mp3');
+        musicPlayer.loop = true; musicPlayer.volume = 0.3;
+        window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
+        function playSound(src, volume = 1.0) { const audio = new Audio(src); audio.volume = volume; audio.play(); }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('button, a.back-button, #game-box').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', () => playSound('sounds/click.mp3')); });
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
+            musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
+            syncMusicState();
+        });
+
+        // --- LOGIQUE DU JEU REFLEX ---
+        const gameBox = document.getElementById('game-box');
+        const statusText = document.getElementById('status-text');
+
+        let gameState = 'waiting'; // 'waiting', 'ready', 'timing', 'result'
+        let startTime;
+        let timeoutId;
+
+        function setScreen(state, text, subtext = '', color, borderColor) {
+            gameState = state;
+            statusText.innerHTML = `${text}${subtext ? `<span>${subtext}</span>` : ''}`;
+            gameBox.style.backgroundColor = color;
+            gameBox.style.borderColor = borderColor;
+            gameBox.style.boxShadow = `0 0 20px ${borderColor}`;
+        }
+
+        function initGame() {
+            clearTimeout(timeoutId);
+            setScreen('waiting', 'Testez vos réflexes', 'Cliquez pour commencer', '#1f2a40', 'var(--color-secondary-glow)');
+        }
+
+        function startGame() {
+            setScreen('ready', 'Attendez le vert...', '', '#c0392b', '#ff4f42'); // Rouge
+            const randomDelay = Math.random() * 4000 + 1000; // Délai entre 1 et 5 secondes
+            timeoutId = setTimeout(showGreen, randomDelay);
+        }
+
+        function showGreen() {
+            setScreen('timing', 'CLIQUEZ !', '', '#27ae60', '#39FF14'); // Vert
+            startTime = Date.now();
+        }
+
+        function endGame(time) {
+            playSound('sounds/coin.mp3', 0.6);
+            setScreen('result', `${time} ms`, 'Cliquez pour rejouer', '#34495e', 'var(--color-tertiary-glow)');
+        }
+        
+        function handleFalseStart() {
+            clearTimeout(timeoutId);
+            playSound('sounds/hit.mp3', 0.5);
+            setScreen('result', 'Trop tôt !', 'Cliquez pour réessayer', '#8e44ad', 'var(--color-primary-glow)');
+        }
+
+        gameBox.addEventListener('click', () => {
+            switch (gameState) {
+                case 'waiting':
+                case 'result':
+                    startGame();
+                    break;
+                case 'ready':
+                    handleFalseStart();
+                    break;
+                case 'timing':
+                    const reactionTime = Date.now() - startTime;
+                    endGame(reactionTime);
+                    break;
+            }
+        });
+
+        initGame(); // Initialise le jeu au chargement
+    </script>
+</body>
+</html>

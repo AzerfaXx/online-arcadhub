@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Morpion - ArcadeHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        .morpion-container { position: relative; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        #status-text, #status-text-game { font-size: 1.5rem; font-family: var(--font-arcade); color: var(--color-tertiary-glow); min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; }
+        #board { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(3, 100px); gap: 5px; background-color: var(--color-secondary-glow); padding: 5px; border-radius: 5px; box-shadow: 0 0 15px var(--color-secondary-glow); }
+        .cell { width: 100px; height: 100px; background-color: var(--color-background); display: flex; justify-content: center; align-items: center; font-size: 4rem; font-family: var(--font-arcade); cursor: pointer; transition: background-color 0.2s; }
+        .cell:hover { background-color: #2a006b; }
+        .cell.x { color: var(--color-primary-glow); text-shadow: 0 0 10px var(--color-primary-glow); }
+        .cell.o { color: var(--color-secondary-glow); text-shadow: 0 0 10px var(--color-secondary-glow); }
+        .cell.winning-cell { background-color: var(--color-tertiary-glow); animation: pop 0.5s ease; }
+        @keyframes pop { 50% { transform: scale(1.1); } }
+        .game-controls button { background-color: var(--color-secondary-glow); color: black; border: none; padding: 15px 30px; font-family: var(--font-arcade); font-size: 1rem; cursor: pointer; border-radius: 5px; margin: 5px; }
+        
+        #game-setup, #online-menu { text-align: center; }
+        #online-menu input { padding: 10px; font-family: var(--font-arcade); margin: 10px 0; border-radius: 5px; border: 2px solid var(--color-secondary-glow); background: #222; color: white; text-align: center; text-transform: uppercase; }
+        #game-area { display: none; flex-direction: column; align-items: center; gap: 20px;}
+        
+        #end-game-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Press Start 2P', cursive;
+            text-align: center;
+            z-index: 100;
+            gap: 15px;
+        }
+        #end-game-screen h2 {
+            font-size: 2.5rem;
+            text-shadow: 0 0 10px, 0 0 20px;
+            margin-bottom: 15px;
+        }
+        #end-game-screen button {
+            background-color: var(--color-tertiary-glow);
+            color: black;
+            border: none;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: transform 0.3s;
+        }
+        #end-game-screen button:hover {
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 400px) {
+            #board { grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); }
+            .cell { width: 80px; height: 80px; font-size: 3rem; }
+            #status-text, #status-text-game { font-size: 1.2rem; min-height: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <div class="background-grid"></div>
+    <header><h1 class="glitch" data-text="MORPION">MORPION</h1></header>
+    <main>
+        <div class="morpion-container">
+            
+            <div id="game-setup">
+                <h2 id="status-text">Choisir un mode</h2>
+                <div class="game-controls">
+                    <button id="vs-ai-btn">Joueur vs IA</button>
+                    <button id="vs-friend-btn">Joueur vs Ami (en ligne)</button>
+                </div>
+            </div>
+
+             <div id="online-menu" style="display: none;">
+                <h2 id="status-text">Jeu en ligne</h2>
+                <div class="game-controls">
+                    <button id="host-btn">Héberger une partie</button>
+                    <div>
+                        <input type="text" id="game-code-input" placeholder="CODE" maxlength="4">
+                        <button id="join-btn">Rejoindre</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="game-area">
+                <div id="board"></div>
+                <div class="game-controls">
+                    <button id="menu-btn">Menu Principal</button>
+                </div>
+            </div>
+            
+            <div id="end-game-screen">
+                <h2 id="end-game-message"></h2>
+                <button id="end-menu-btn">Menu Principal</button>
+            </div>
+
+        </div>
+        <a href="index.html" class="back-button" style="margin-top: 30px;">&lt; RETOUR</a>
+    </main>
+    <script>
+        // ... Bloc audio global ...
+        const musicPlayer = new Audio('sounds/ambiance.mp3'); musicPlayer.loop = true; musicPlayer.volume = 0.3;
+        window.addEventListener('beforeunload', () => { if (!musicPlayer.paused) localStorage.setItem('musicCurrentTime', musicPlayer.currentTime); });
+        function playSound(src, volume = 1.0) { const audio = new Audio(src); audio.volume = volume; audio.play(); }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('button, a.back-button').forEach(elem => { if (elem.id !== 'music-toggle-btn') elem.addEventListener('click', () => playSound('sounds/click.mp3')); });
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const syncMusicState = () => { if (localStorage.getItem('musicState') === 'playing') { const savedTime = parseFloat(localStorage.getItem('musicCurrentTime') || '0'); musicPlayer.currentTime = savedTime; musicPlayer.play().catch(e => {}); musicBtn.classList.add('playing'); } else { musicPlayer.pause(); musicBtn.classList.remove('playing'); } };
+            musicBtn.addEventListener('click', () => { if (musicPlayer.paused) localStorage.setItem('musicState', 'playing'); else { localStorage.setItem('musicState', 'paused'); localStorage.removeItem('musicCurrentTime'); } syncMusicState(); });
+            syncMusicState();
+        });
+
+        // --- Logique du Morpion ---
+        const boardElement = document.getElementById('board');
+        const gameSetupDiv = document.getElementById('game-setup');
+        const onlineMenuDiv = document.getElementById('online-menu');
+        const gameAreaDiv = document.getElementById('game-area');
+        const endGameScreen = document.getElementById('end-game-screen');
+        const endGameMessage = document.getElementById('end-game-message');
+
+        let currentPlayer = 'X';
+        let boardState = Array(9).fill(null);
+        let gameActive = true;
+        let gameMode = null; 
+        let socket; 
+        let playerSymbol; 
+
+        const winningCombinations = [ [0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6] ];
+
+        function goToMainMenu() {
+            if (socket) socket.disconnect();
+            gameAreaDiv.style.display = 'none';
+            onlineMenuDiv.style.display = 'none';
+            endGameScreen.style.display = 'none';
+            gameSetupDiv.style.display = 'block';
+            document.querySelector('#game-setup #status-text').textContent = "Choisir un mode";
+            document.getElementById('game-code-input').value = '';
+        }
+
+        document.getElementById('vs-ai-btn').addEventListener('click', () => {
+             gameMode = 'ai';
+             startGame();
+        });
+        document.getElementById('vs-friend-btn').addEventListener('click', () => {
+            gameSetupDiv.style.display = 'none';
+            onlineMenuDiv.style.display = 'block';
+            document.querySelector('#online-menu #status-text').textContent = "Jeu en ligne";
+            initOnline();
+        });
+        document.getElementById('menu-btn').addEventListener('click', goToMainMenu);
+        document.getElementById('end-menu-btn').addEventListener('click', goToMainMenu);
+        
+        // La fonction et le listener pour "Rejouer" ont été supprimés.
+        
+        function startGame() {
+            gameSetupDiv.style.display = 'none';
+            onlineMenuDiv.style.display = 'none';
+            gameAreaDiv.style.display = 'flex';
+            let statusInGame = document.getElementById('status-text-game');
+            if (!statusInGame) {
+                statusInGame = document.createElement('h2');
+                statusInGame.id = 'status-text-game';
+                gameAreaDiv.insertBefore(statusInGame, boardElement);
+            }
+            resetGame();
+        }
+
+        function updateStatus(text) {
+            const statusOnline = document.querySelector('#online-menu #status-text');
+            const statusGame = document.getElementById('status-text-game');
+            if (statusOnline && onlineMenuDiv.style.display !== 'none') {
+                 statusOnline.innerHTML = text;
+            }
+            if(statusGame && gameAreaDiv.style.display !== 'none'){
+                statusGame.innerHTML = text;
+            }
+        }
+        
+        function updateBoard() {
+            for (let i = 0; i < 9; i++) {
+                const cell = document.querySelector(`.cell[data-index='${i}']`);
+                cell.textContent = boardState[i] || '';
+                cell.classList.remove('x', 'o');
+                if (boardState[i]) cell.classList.add(boardState[i].toLowerCase());
+            }
+        }
+
+        function handleCellClick(index) {
+            if (!gameActive || boardState[index]) return;
+            if (gameMode === 'online' && currentPlayer !== playerSymbol) return;
+
+            const moveSymbol = currentPlayer;
+            makeMove(index, moveSymbol);
+            
+            if (gameMode === 'online') {
+                socket.emit('makeMove', { index, player: moveSymbol });
+            }
+
+            if (gameActive && gameMode === 'ai' && currentPlayer === 'O') {
+                setTimeout(aiMove, 500);
+            }
+        }
+        
+        function makeMove(index, player){
+            if (!gameActive || boardState[index]) return;
+            boardState[index] = player;
+            updateBoard();
+            playSound('sounds/place-piece.mp3', 0.5);
+            checkResult();
+        }
+
+        function checkResult() {
+            let roundWon = false; let winningCombo;
+            for (const combination of winningCombinations) {
+                const [a, b, c] = combination;
+                if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                    roundWon = true; winningCombo = combination; break;
+                }
+            }
+            if (roundWon) {
+                gameActive = false;
+                winningCombo.forEach(i => document.querySelector(`.cell[data-index='${i}']`).classList.add('winning-cell'));
+                const winner = boardState[winningCombo[0]];
+
+                if (gameMode === 'online') {
+                    if (winner === playerSymbol) {
+                        showEndScreen("VICTOIRE !", true);
+                        playSound('sounds/win.mp3');
+                    } else {
+                        showEndScreen("DEFAITE...", false);
+                        playSound('sounds/game-over.mp3', 0.4);
+                    }
+                } else { // Mode IA
+                    if (winner === 'X') {
+                        showEndScreen(`VICTOIRE !`, true);
+                        playSound('sounds/win.mp3');
+                    } else {
+                        showEndScreen(`DEFAITE...`, false);
+                        playSound('sounds/game-over.mp3', 0.4);
+                    }
+                }
+                return;
+            }
+            if (!boardState.includes(null)) {
+                gameActive = false;
+                showEndScreen('MATCH NUL');
+                playSound('sounds/game-over.mp3', 0.4);
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            if (gameMode === 'online') {
+                updateStatus(currentPlayer === playerSymbol ? "C'est votre tour !" : "Tour de l'adversaire...");
+            } else {
+                updateStatus(`Tour du joueur ${currentPlayer}`);
+            }
+        }
+
+        function showEndScreen(message, isWin = null) {
+            endGameMessage.textContent = message;
+            if (isWin === true) endGameMessage.style.color = 'var(--color-secondary-glow)';
+            else if (isWin === false) endGameMessage.style.color = 'var(--color-primary-glow)';
+            else endGameMessage.style.color = 'var(--color-tertiary-glow)';
+            endGameScreen.style.display = 'flex';
+        }
+        
+        function resetGame() {
+            currentPlayer = 'X'; boardState.fill(null); gameActive = true;
+            if (gameMode === 'ai') {
+                 // Pour le mode IA, on réinitialise l'écran de fin et on recommence
+                 endGameScreen.style.display = 'none';
+                 updateStatus(`Tour du joueur ${currentPlayer}`);
+            } else if (gameMode === 'online') {
+                 updateStatus(playerSymbol === 'X' ? "C'est votre tour !" : "Tour de l'adversaire...");
+            }
+            document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('x', 'o', 'winning-cell'));
+            updateBoard();
+        }
+        
+        function aiMove() { if(!gameActive) return; const bestMove = findBestMove(boardState); makeMove(bestMove, 'O'); }
+        function findBestMove(board) { let bestVal = -1000; let move = -1; for (let i = 0; i < 9; i++) { if (board[i] === null) { board[i] = 'O'; let moveVal = minimax(board, 0, false); board[i] = null; if (moveVal > bestVal) { bestVal = moveVal; move = i; } } } return move; }
+        function evaluate(b) { for (const combination of winningCombinations) { const [a, c, d] = combination; if (b[a] && b[a] === b[c] && b[a] === b[d]) { if (b[a] === 'O') return 10; if (b[a] === 'X') return -10; } } return 0; }
+        function minimax(board, depth, isMax) { let score = evaluate(board); if (score === 10 || score === -10) return score - depth; if (!board.includes(null)) return 0; if (isMax) { let best = -1000; for (let i = 0; i < 9; i++) { if (board[i] === null) { board[i] = 'O'; best = Math.max(best, minimax(board, depth + 1, !isMax)); board[i] = null; } } return best; } else { let best = 1000; for (let i = 0; i < 9; i++) { if (board[i] === null) { board[i] = 'X'; best = Math.min(best, minimax(board, depth + 1, !isMax)); board[i] = null; } } return best; } }
+        
+        function initOnline() {
+            if (!socket || !socket.connected) {
+                socket = io("https://online-arcadhub.onrender.com");
+            }
+
+            socket.on('connect', () => {
+                console.log(`[CLIENT] Connecté au serveur avec l'ID: ${socket.id}`);
+            });
+            
+            document.getElementById('host-btn').onclick = () => socket.emit('hostGame');
+            document.getElementById('join-btn').onclick = () => {
+                const codeInput = document.getElementById('game-code-input');
+                const code = codeInput.value.toUpperCase();
+                if (code) socket.emit('joinGame', code);
+                else codeInput.placeholder = "CODE?";
+            };
+
+            socket.off('gameHosted').on('gameHosted', (gameCode) => {
+                playerSymbol = 'X';
+                gameMode = 'online';
+                startGame();
+                updateStatus(`Code: <span style="color: white; user-select: all; background: #333; padding: 5px 10px; border-radius: 5px;">${gameCode}</span><br><small>En attente d'un ami...</small>`);
+            });
+            
+            socket.off('gameStarted').on('gameStarted', (symbol) => {
+                if (playerSymbol === undefined) playerSymbol = 'O'; 
+                gameMode = 'online';
+                startGame();
+            });
+
+            socket.off('moveMade').on('moveMade', ({ index, player }) => {
+                makeMove(index, player);
+            });
+            
+            // L'événement "restartGame" a été supprimé.
+
+            socket.off('opponentDisconnected').on('opponentDisconnected', () => {
+                if(gameActive) {
+                    showEndScreen("L'adversaire est parti.", null);
+                    gameActive = false;
+                }
+            });
+
+            socket.off('error').on('error', (message) => {
+                const statusOnline = document.querySelector('#online-menu #status-text');
+                statusOnline.textContent = message;
+                statusOnline.style.color = 'var(--color-primary-glow)';
+                setTimeout(() => {
+                    statusOnline.textContent = "Jeu en ligne";
+                    statusOnline.style.color = 'var(--color-tertiary-glow)';
+                }, 3000);
+            });
+        }
+        
+        (function createBoard() {
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', () => handleCellClick(i));
+                boardElement.appendChild(cell);
+            }
+        })();
+    </script>
+</body>
+</html>

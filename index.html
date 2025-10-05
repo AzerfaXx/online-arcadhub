@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArcadeHub - Ta Centrale de Jeux Rétro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <button id="music-toggle-btn" title="Activer/Désactiver la musique"></button>
+    <button id="installBtn" style="display:none; position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#ff00c1; color:white; border:none; border-radius:10px; cursor:pointer;">
+        Installer ArcadeHub
+    </button>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p>CHARGEMENT...</p>
+    </div>
+
+    <div class="background-grid"></div>
+
+    <header>
+        <h1 class="glitch" data-text="ARCADEHUB">ARCADE HUB</h1>
+        <p class="subtitle">La centrale du jeu rétro</p>
+    </header>
+
+    <main id="game-gallery">
+        <div class="game-card">
+            <img src="images/snake.png" alt="Snake" class="game-img">
+            <h2>Snake</h2>
+            <p>Le classique indémodable. Mangez les pommes et ne vous mordez pas la queue !</p>
+            <a href="snake.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/pong.png" alt="Aperçu du jeu Pong">
+            <h2>Pong</h2>
+            <p>Le tout premier jeu d'arcade. Défiez l'ordinateur dans un match épique.</p>
+            <a href="pong.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/tetris.png" alt="Aperçu du jeu Tetris">
+            <h2>Tetris</h2>
+            <p>Empilez les briques, complétez les lignes et visez le meilleur score.</p>
+            <a href="tetris.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/space.png" alt="Aperçu du jeu Space Invaders">
+            <h2>Space Invaders</h2>
+            <p>Défendez la Terre contre des vagues d'envahisseurs extraterrestres.</p>
+            <a href="space-invaders.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/2048.png" alt="Aperçu du jeu 2048">
+            <h2>2048</h2>
+            <p>Faites glisser les tuiles pour combiner les nombres et atteindre la fameuse tuile 2048.</p>
+            <a href="2048.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/demineur.png" alt="Aperçu du jeu Démineur">
+            <h2>Démineur</h2>
+            <p>Le puzzle classique. Trouvez toutes les mines sans en faire exploser une seule !</p>
+            <a href="demineur.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/solitaire.png" alt="Aperçu du jeu Solitaire">
+            <h2>Solitaire</h2>
+            <p>Le grand classique des jeux de cartes. Triez les suites et videz le plateau !</p>
+            <a href="solitaire.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/morpion.png" alt="Aperçu du jeu Morpion">
+            <h2>Morpion</h2>
+            <p>Le célèbre jeu de réflexion. Alignez 3 symboles pour gagner. Jouable à deux !</p>
+            <a href="morpion.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/glow-breaker.png" alt="Aperçu du jeu Glow Breaker">
+            <h2>Glow Breaker</h2>
+            <p>Un casse-briques revisité à la sauce néon. Détruisez tout avec style !</p>
+            <a href="glow-breaker.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/synth-jumper.png" alt="Aperçu du jeu Synth Jumper">
+            <h2>Synth Jumper</h2>
+            <p>Grimpez à l'infini dans un décor synthwave. Évitez de tomber et visez le meilleur score !</p>
+            <a href="synth-jumper.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/gem-crush.png" alt="Aperçu du jeu Gem Crush">
+            <h2>Gem Crush</h2>
+            <p>Alignez les gemmes, créez des combos explosifs et visez le meilleur score !</p>
+            <a href="gem-crush.html" class="play-button">JOUER</a>
+        </div>
+
+        <div class="game-card">
+            <img src="images/reflex.png" alt="Aperçu du jeu Reflex">
+            <h2>Reflex</h2>
+            <p>L'écran est rouge... Dès qu'il passe au vert, cliquez le plus vite possible !</p>
+            <a href="reflex.html" class="play-button">JOUER</a>
+        </div>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2025 ArcadeHub - Créé par AzerfaXx avec passion 👾</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
