@@ -14,6 +14,9 @@ app.use(express.json());
 // ==================================================================
 //               CONNEXION À LA BASE DE DONNÉES
 // ==================================================================
+
+console.log('[SERVEUR] Lecture de la variable MONGODB_URI:', process.env.MONGODB_URI);
+
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
